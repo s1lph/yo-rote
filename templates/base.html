@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel='stylesheet'
+        href='https://cdn-uicons.flaticon.com/3.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css'>
+    <link rel='stylesheet'
+        href='https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
+    <title>{% block title %}yo.route{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    {% if show_menu %}
+    <div class="sidebar">
+        <a href="/" class="logo" style="text-decoration: none; display: block;">yo.route {}</a>
+        <nav class="menu">
+            <div class="menu-section">
+                <div class="menu-label">Рабочий процесс</div>
+                <a href="/orders" class="menu-item {% if request.path == '/orders' %}active{% endif %}">
+                    <i class="fi fi-sr-clipboard-list menu-icon"></i>
+                    <span class="menu-text">Заказы</span>
+                </a>
+                <a href="/optimization" class="menu-item {% if request.path == '/optimization' %}active{% endif %}">
+                    <i class="fi fi-sr-map menu-icon"></i>
+                    <span class="menu-text">Планирование маршрута</span>
+                </a>
+            </div>
+            <div class="menu-section">
+                <div class="menu-label">Ресурсы</div>
+                <a href="/points" class="menu-item {% if request.path == '/points' %}active{% endif %}">
+                    <i class="fi fi-sr-map-marker menu-icon"></i>
+                    <span class="menu-text">Точки отправки</span>
+                </a>
+                <a href="/couriers" class="menu-item {% if request.path == '/couriers' %}active{% endif %}">
+                    <i class="fi fi-sr-users-alt menu-icon"></i>
+                    <span class="menu-text">Курьеры</span>
+                </a>
+            </div>
+            <div class="menu-section">
+                <div class="menu-label">Сервис</div>
+                <a href="/settings" class="menu-item {% if request.path == '/settings' %}active{% endif %}">
+                    <i class="fi fi-sr-settings menu-icon"></i>
+                    <span class="menu-text">Общие настройки</span>
+                </a>
+            </div>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="/account" class="account-link {% if request.path == '/account' %}active{% endif %}">
+                <div class="account-link-text">
+                    <i class="fi fi-sr-user menu-icon"></i>
+                    <span class="menu-text">Настройки аккаунта</span>
+                </div>
+                <span class="account-link-hint">→</span>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <main class="main-content {% if not show_menu %}full-width{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Применяем сохранённую тему при загрузке страницы
+        (function () {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.classList.add(`theme-${savedTheme}`);
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

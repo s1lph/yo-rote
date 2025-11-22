@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% set show_menu = True %}
+
+{% block title %}Точки отправки - yo.route{% endblock %}
+
+{% block content %}
+<div class="two-column" id="points-container" style="max-width: 100%;">
+    <div class="column" style="padding-bottom: 80px;">
+        <h1 class="page-title" style="margin-bottom: 8px;"><i class="fi fi-sr-map-marker"
+                style="color: var(--primary-blue);"></i> Точки отправки</h1>
+
+        <div class="radio-group" id="points-list">
+            <div class="radio-item">
+                <label>Загрузка точек...</label>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" id="add-point-btn" style="margin-top: 24px;"><i class="fi fi-sr-marker"></i>
+            Добавить точку</button>
+    </div>
+
+    <div class="column" id="add-point-column" style="display: none; opacity: 0;">
+        <div class="page-header">
+            <button class="back-button" id="close-add-point-btn">←</button>
+            <h2 class="page-title" style="font-size: 20px;">Добавление точки</h2>
+        </div>
+
+        <form action="/api/points" method="POST" id="add-point-form">
+            <div class="form-group">
+                <label class="form-label" for="address">Адрес</label>
+                <input type="text" id="address" name="address" class="form-input" placeholder="Введите Адрес..."
+                    required>
+            </div>
+
+            <div class="checkbox-group">
+                <input type="checkbox" id="make_primary" name="make_primary" class="checkbox-input" checked>
+                <label for="make_primary" class="checkbox-label">Сделать основным</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+
+        <div class="map-container" style="margin-top: 24px; min-height: 400px;">
+            <div>Интерфейс добавления точки</div>
+        </div>
+    </div>
+</div>
+
+<!-- Панель действий для выбранной точки -->
+<div id="selected-point-panel" class="selection-panel">
+    <div class="selection-panel-content">
+        <span id="selected-point-text" class="selection-panel-text">Выбрана 1 точка</span>
+        <button id="clear-point-selection" class="selection-panel-close">
+            <i class="fi fi-sr-cross-small"></i>
+        </button>
+    </div>
+    <div class="selection-panel-actions">
+        <button class="btn btn-secondary" id="edit-point-btn">
+            <i class="fi fi-sr-edit"></i> Изменить
+        </button>
+        <button class="btn btn-secondary" id="delete-point-btn">
+            <i class="fi fi-sr-trash"></i> Удалить
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', async function () {
+        const addPointBtn = document.getElementById('add-point-btn');
+        const addPointColumn = document.getElementById('add-point-column');
+        const closeAddPointBtn = document.getElementById('close-add-point-btn');
+        const pointsContainer = document.getElementById('points-container');
+        const selectedPointPanel = document.getElementById('selected-point-panel');
+        const selectedPointText = document.getElementById('selected-point-text');
+        const clearPointSelection = document.getElementById('clear-point-selection');
+        const editPointBtn = document.getElementById('edit-point-btn');
+        const deletePointBtn = document.getElementById('delete-point-btn');
+        const addPointForm = document.getElementById('add-point-form');
+        const pointsList = document.getElementById('points-list');
+        const makePrimaryCheckbox = document.getElementById('make_primary');
+        const addressInput = document.getElementById('address');
+        const state = {
+            points: []
+        };
+
+        await loadPointsList();
+        handleHashIntent();
+
+        clearPointSelection.addEventListener('click', function () {
+            document.querySelectorAll('input[name="selected_point"]').forEach(radio => radio.checked = false);
+            updateSelectedPointPanel();
+        });
+
+        editPointBtn.addEventListener('click', function () {
+            const selected = document.querySelector('input[name="selected_point"]:checked');
+            if (!selected) {
+                showNotification('Выберите точку для редактирования', 'info');
+                return;
+            }
+            const point = state.points.find(p => String(p.id) === String(selected.value));
+            if (!point) {
+                showNotification('Не удалось найти данные точки', 'error');
+                return;
+            }
+            setFormMode('edit', point);
+            openAddPointForm();
+        });
+
+        deletePointBtn.addEventListener('click', async function () {
+            const selected = document.querySelector('input[name="selected_point"]:checked');
+            if (!selected) {
+                showNotification('Выберите точку для удаления', 'info');
+                return;
+            }
+            const point = state.points.find(p => String(p.id) === String(selected.value));
+            if (!point) return;
+
+            if (confirm(`Удалить точку "${point.address}"?`)) {
+                try {
+                    const response = await fetch(`/api/points/${point.id}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        showNotification('Точка успешно удалена', 'success');
+                        await loadPointsList();
+                        updateSelectedPointPanel();
+                    } else {
+                        showNotification(result.message || 'Ошибка при удалении', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting point:', error);
+                    showNotification('Ошибка соединения с сервером', 'error');
+                }
+            }
+        });
+
+        addPointBtn.addEventListener('click', function () {
+            setFormMode('create');
+            openAddPointForm();
+            window.location.hash = '#add-point';
+        });
+
+        closeAddPointBtn.addEventListener('click', function () {
+            closeAddPointForm();
+        });
+
+        window.addEventListener('hashchange', handleHashIntent);
+
+        addPointForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            data.make_primary = formData.get('make_primary') === 'on';
+            const editId = this.dataset.editId;
+
+            try {
+                const url = editId ? `/api/points/${editId}` : '/api/points';
+                const method = editId ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showNotification(editId ? 'Точка обновлена' : 'Точка добавлена', 'success');
+                    await loadPointsList();
+                    closeAddPointForm();
+                    if (!editId && result.id) {
+                        selectPointById(result.id);
+                    }
+                } else {
+                    showNotification(result.message || 'Ошибка при сохранении', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving point:', error);
+                showNotification('Ошибка соединения с сервером', 'error');
+            }
+        });
+
+        async function loadPointsList() {
+            try {
+                let { points = [] } = await api.get('/api/points');
+                if (!points.length) {
+                    points = getSamplePoints();
+                }
+                state.points = points;
+                renderPoints(points);
+            } catch (error) {
+                console.error('Error loading points:', error);
+                state.points = getSamplePoints();
+                renderPoints(state.points);
+            }
+        }
+
+        function renderPoints(points) {
+            if (!points.length) {
+                pointsList.innerHTML = `
+                    <div class="radio-item">
+                        <label>Точек пока нет</label>
+                    </div>
+                `;
+                selectedPointPanel.style.display = 'none';
+                return;
+            }
+
+            pointsList.innerHTML = points.map(point => `
+                <div class="radio-item ${point.is_primary ? 'primary-point' : ''}">
+                    <input type="radio" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
+                    <label for="point-${point.id}">
+                        ${point.address}
+                        ${point.is_primary ? '<span class="primary-badge">Главная точка</span>' : ''}
+                    </label>
+                </div>
+            `).join('');
+
+            updateRadioButtons();
+            updateSelectedPointPanel();
+        }
+
+        function updateSelectedPointPanel() {
+            const selected = document.querySelector('input[name="selected_point"]:checked');
+            if (selected) {
+                const address = selected.closest('.radio-item').querySelector('label').textContent.trim();
+                selectedPointText.textContent = `Выбрана: ${address}`;
+                selectedPointPanel.classList.add('active');
+            } else {
+                selectedPointPanel.classList.remove('active');
+            }
+        }
+
+        function updateRadioButtons() {
+            const radioButtons = document.querySelectorAll('input[name="selected_point"]');
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', updateSelectedPointPanel);
+            });
+        }
+
+        function openAddPointForm() {
+            addPointColumn.style.display = 'block';
+            pointsContainer.classList.add('show-add-form');
+            setTimeout(() => {
+                addPointColumn.style.opacity = '1';
+            }, 10);
+        }
+
+        function closeAddPointForm() {
+            addPointColumn.style.opacity = '0';
+            setTimeout(() => {
+                addPointColumn.style.display = 'none';
+                pointsContainer.classList.remove('show-add-form');
+                addPointForm.reset();
+                addPointForm.removeAttribute('data-edit-id');
+                makePrimaryCheckbox.checked = true;
+                const formTitle = addPointColumn.querySelector('.page-title');
+                formTitle.textContent = 'Добавление точки';
+                if (window.location.hash === '#add-point') {
+                    history.replaceState(null, '', window.location.pathname);
+                }
+            }, 300);
+        }
+
+        function setFormMode(mode, point = null) {
+            const formTitle = addPointColumn.querySelector('.page-title');
+            if (mode === 'edit' && point) {
+                formTitle.textContent = 'Редактирование точки';
+                addressInput.value = point.address || '';
+                makePrimaryCheckbox.checked = !!point.is_primary;
+                addPointForm.dataset.editId = point.id;
+            } else {
+                formTitle.textContent = 'Добавление точки';
+                makePrimaryCheckbox.checked = true;
+                addPointForm.reset();
+                addPointForm.removeAttribute('data-edit-id');
+            }
+        }
+
+        function selectPointById(pointId) {
+            const input = document.querySelector(`input[name="selected_point"][value="${pointId}"]`);
+            if (input) {
+                input.checked = true;
+                updateSelectedPointPanel();
+            }
+        }
+
+        function handleHashIntent() {
+            if (window.location.hash === '#add-point') {
+                setFormMode('create');
+                openAddPointForm();
+            }
+        }
+
+        function getSamplePoints() {
+            return [
+                { id: 1, address: 'Москва, ул. Оршанская 13', is_primary: true },
+                { id: 2, address: 'Химки, ул. Германа Титова 3', is_primary: false }
+            ];
+        }
+    });
+</script>
+{% endblock %}

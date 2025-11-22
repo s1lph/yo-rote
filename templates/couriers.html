@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% set show_menu = True %}
+
+{% block title %}Курьеры - yo.route{% endblock %}
+
+{% block content %}
+<div class="two-column" id="couriers-container" style="max-width: 100%;">
+    <div class="column" style="padding-bottom: 80px;">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fi fi-sr-users-alt" style="color: var(--primary-blue);"></i> Курьеры</h1>
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Курьер</th>
+                        <th>Тип транспорта</th>
+                        <th>Номер телефона</th>
+                        <th>Телеграм</th>
+                        <th>Ключ Аутентификации</th>
+                        <th>Текущий заказ</th>
+                    </tr>
+                </thead>
+                <tbody id="couriers-table-body">
+                    <tr>
+                        <td><input type="radio" name="selected_courier" value="1"></td>
+                        <td>Азымбек Казбек</td>
+                        <td>Легковой автомобиль</td>
+                        <td>+79886761488</td>
+                        <td>@azibek2269</td>
+                        <td>********</td>
+                        <td>Москва ул. Пушкина 67</td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" name="selected_courier" value="2"></td>
+                        <td>Азамат Айталиев</td>
+                        <td>Грузовик</td>
+                        <td>+7977690013</td>
+                        <td>@azamat_official</td>
+                        <td>********</td>
+                        <td>Москва ул. Ленина 12</td>
+                    </tr>
+                    <tr>
+                        <td><input type="radio" name="selected_courier" value="3"></td>
+                        <td>Михаил Щербетов</td>
+                        <td>Скутер</td>
+                        <td>+79112345667</td>
+                        <td>@mishanya_pro0</td>
+                        <td>********</td>
+                        <td>Москва пр. Мира 45</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn btn-primary" id="add-courier-btn" style="margin-top: 24px;"><i class="fi fi-sr-user-add"></i>
+            Добавить курьера</button>
+    </div>
+
+    <!-- Форма добавления/редактирования курьера (скрыта по умолчанию, открывается справа) -->
+    <div class="column" id="add-courier-column" style="display: none; opacity: 0;">
+        <div class="page-header">
+            <button class="back-button" id="close-add-courier-btn">←</button>
+            <h2 class="page-title" style="font-size: 20px;">Добавление курьера</h2>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+            <a href="t.me/example" target="_blank"
+                style="color: var(--primary-blue); text-decoration: none;">t.me/example ↑</a>
+        </div>
+
+        <form action="/api/couriers" method="POST" id="courier-form">
+            <div class="form-group">
+                <label class="form-label" for="full_name">ФИО</label>
+                <input type="text" id="full_name" name="full_name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="phone">Номер телефона</label>
+                <input type="tel" id="phone" name="phone" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="telegram">Телеграм</label>
+                <input type="text" id="telegram" name="telegram" class="form-input" placeholder="@username" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="vehicle_type">Тип транспорта</label>
+                <select id="vehicle_type" name="vehicle_type" class="form-select" required>
+                    <option value="">Выберите тип транспорта</option>
+                    <option value="car">Легковой автомобиль</option>
+                    <option value="truck">Грузовик</option>
+                    <option value="bicycle">Велосипед</option>
+                    <option value="scooter">Скутер</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="auth_key">Введите ключ аутентификации</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="auth_key" name="auth_key" class="form-input" required>
+                    <button type="button" class="btn btn-secondary" data-popup="auth-instruction-popup">Как?</button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+    </div>
+</div>
+
+<!-- Панель действий для выбранного курьера -->
+<div id="selected-courier-panel" class="selection-panel">
+    <div class="selection-panel-content">
+        <span id="selected-courier-text" class="selection-panel-text">Выбран 1 курьер</span>
+        <button id="clear-courier-selection" class="selection-panel-close">
+            <i class="fi fi-sr-cross-small"></i>
+        </button>
+    </div>
+    <div class="selection-panel-actions">
+        <button class="btn btn-secondary" id="edit-courier-btn">
+            <i class="fi fi-sr-edit"></i> Изменить
+        </button>
+        <button class="btn btn-secondary" id="delete-courier-btn">
+            <i class="fi fi-sr-trash"></i> Удалить
+        </button>
+    </div>
+</div>
+
+<!-- Popup с инструкцией -->
+<div class="popup" id="auth-instruction-popup">
+    <div class="popup-content">
+        <button class="popup-close">&times;</button>
+        <h3 class="popup-title">Инструкция получения кода аутентификации для курьера</h3>
+        <ol style="padding-left: 20px; line-height: 2;">
+            <li>Зарегистрироваться в боте</li>
+            <li>Нажать кнопку "Генерация кода"</li>
+            <li>Перенести код в поле регистрации</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Загрузка курьеров
+    document.addEventListener('DOMContentLoaded', async function () {
+        try {
+            const couriersData = await api.get('/api/couriers');
+            // TODO: Обновить таблицу курьеров
+        } catch (error) {
+            console.error('Error loading couriers:', error);
+        }
+
+        // Элементы для работы с курьерами
+        const addCourierBtn = document.getElementById('add-courier-btn');
+        const addCourierColumn = document.getElementById('add-courier-column');
+        const closeAddCourierBtn = document.getElementById('close-add-courier-btn');
+        const couriersContainer = document.getElementById('couriers-container');
+        const selectedCourierPanel = document.getElementById('selected-courier-panel');
+        const selectedCourierText = document.getElementById('selected-courier-text');
+        const clearCourierSelection = document.getElementById('clear-courier-selection');
+        const editCourierBtn = document.getElementById('edit-courier-btn');
+        const deleteCourierBtn = document.getElementById('delete-courier-btn');
+        const courierForm = document.getElementById('courier-form');
+        const couriersTableBody = document.getElementById('couriers-table-body');
+
+        // Маппинг типов транспорта для отображения
+        const vehicleTypeMap = {
+            'car': 'Легковой автомобиль',
+            'truck': 'Грузовик',
+            'bicycle': 'Велосипед',
+            'scooter': 'Скутер'
+        };
+
+        // Обработка выбора курьера
+        function updateSelectedCourierPanel() {
+            const selected = document.querySelector('input[name="selected_courier"]:checked');
+            if (selected) {
+                const name = selected.closest('tr').cells[1].textContent;
+                selectedCourierText.textContent = `Выбран: ${name}`;
+                selectedCourierPanel.classList.add('active');
+            } else {
+                selectedCourierPanel.classList.remove('active');
+            }
+        }
+
+        // Обновление обработчиков при изменении таблицы
+        function updateRadioButtons() {
+            const radioButtons = document.querySelectorAll('input[name="selected_courier"]');
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', function () {
+                    updateSelectedCourierPanel();
+                });
+            });
+        }
+
+        // Инициализация обработчиков
+        updateRadioButtons();
+        updateSelectedCourierPanel();
+
+        // Очистка выбора
+        clearCourierSelection.addEventListener('click', function () {
+            document.querySelectorAll('input[name="selected_courier"]').forEach(radio => radio.checked = false);
+            updateSelectedCourierPanel();
+        });
+
+        // Редактирование курьера
+        editCourierBtn.addEventListener('click', function () {
+            const selected = document.querySelector('input[name="selected_courier"]:checked');
+            if (!selected) return;
+
+            const courierId = selected.value;
+            const row = selected.closest('tr');
+            const courierName = row.cells[1].textContent;
+            const vehicleType = row.cells[2].textContent;
+            const phone = row.cells[3].textContent;
+            const telegram = row.cells[4].textContent;
+
+            // Заполняем форму данными выбранного курьера
+            document.getElementById('full_name').value = courierName;
+            document.getElementById('phone').value = phone;
+            document.getElementById('telegram').value = telegram;
+
+            // Находим значение типа транспорта
+            let vehicleValue = '';
+            for (const [key, value] of Object.entries(vehicleTypeMap)) {
+                if (value === vehicleType) {
+                    vehicleValue = key;
+                    break;
+                }
+            }
+            document.getElementById('vehicle_type').value = vehicleValue;
+
+            // Меняем заголовок формы на "Редактирование курьера"
+            const formTitle = addCourierColumn.querySelector('.page-title');
+            formTitle.textContent = 'Редактирование курьера';
+
+            // Сохраняем ID курьера для обновления
+            courierForm.dataset.editId = courierId;
+
+            // Показываем форму справа
+            addCourierColumn.style.display = 'block';
+            couriersContainer.classList.add('show-add-form');
+            setTimeout(() => {
+                addCourierColumn.style.opacity = '1';
+            }, 10);
+        });
+
+        // Удаление курьера
+        deleteCourierBtn.addEventListener('click', async function () {
+            const selected = document.querySelector('input[name="selected_courier"]:checked');
+            if (!selected) return;
+
+            const courierId = selected.value;
+            const row = selected.closest('tr');
+            const courierName = row.cells[1].textContent;
+
+            if (confirm(`Удалить курьера "${courierName}"?`)) {
+                try {
+                    const response = await fetch(`/api/couriers/${courierId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showNotification('Курьер успешно удален', 'success');
+                        // Удаляем строку из таблицы
+                        row.remove();
+                        updateSelectedCourierPanel();
+                        updateRadioButtons();
+                    } else {
+                        showNotification(result.message || 'Ошибка при удалении', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Ошибка соединения с сервером', 'error');
+                }
+            }
+        });
+
+        // Обработка кнопки "Добавить курьера"
+        addCourierBtn.addEventListener('click', function () {
+            // Сбрасываем форму и заголовок
+            courierForm.reset();
+            courierForm.removeAttribute('data-edit-id');
+            const formTitle = addCourierColumn.querySelector('.page-title');
+            formTitle.textContent = 'Добавление курьера';
+
+            addCourierColumn.style.display = 'block';
+            couriersContainer.classList.add('show-add-form');
+            setTimeout(() => {
+                addCourierColumn.style.opacity = '1';
+            }, 10);
+        });
+
+        closeAddCourierBtn.addEventListener('click', function () {
+            closeAddCourierForm();
+        });
+
+        // Функция закрытия формы добавления/редактирования курьера
+        function closeAddCourierForm() {
+            addCourierColumn.style.opacity = '0';
+            setTimeout(() => {
+                addCourierColumn.style.display = 'none';
+                couriersContainer.classList.remove('show-add-form');
+                courierForm.reset();
+                courierForm.removeAttribute('data-edit-id');
+                const formTitle = addCourierColumn.querySelector('.page-title');
+                formTitle.textContent = 'Добавление курьера';
+            }, 300);
+        }
+
+        // Обработка формы добавления/редактирования курьера
+        courierForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            const editId = this.dataset.editId;
+
+            try {
+                const url = editId ? `/api/couriers/${editId}` : '/api/couriers';
+                const method = editId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(editId ? 'Курьер успешно изменен' : 'Курьер успешно добавлен', 'success');
+                    closeAddCourierForm();
+                    // TODO: Обновить таблицу курьеров
+                    updateRadioButtons();
+                } else {
+                    showNotification(result.message || 'Ошибка при сохранении', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Ошибка соединения с сервером', 'error');
+            }
+        });
+    });
+</script>
+{% endblock %}

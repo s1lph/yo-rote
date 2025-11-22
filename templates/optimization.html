@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% set show_menu = True %}
+
+{% block title %}Планирование маршрута - yo.route{% endblock %}
+
+{% block content %}
+<div class="two-column show-map" id="optimization-container" style="max-width: 100%;">
+    <div class="column">
+        <h1 class="page-title" style="margin-bottom: 32px;">Планирование маршрута</h1>
+        
+        <div class="date-input-group">
+            <label class="date-label" for="day">День:</label>
+            <input type="date" id="day" name="day" class="form-input" style="width: auto;">
+        </div>
+        
+        <div class="list-section">
+            <div class="section-title">Заказы</div>
+            <button id="optimization-add-order" class="btn btn-secondary btn-small" style="margin-bottom: 16px;" type="button">+</button>
+            <div id="orders-list" class="orders-list">
+                <div class="list-item">Загрузка заказов...</div>
+            </div>
+        </div>
+        
+        <div class="list-section">
+            <div class="section-title">Маршруты</div>
+            <div class="tabs">
+                <button class="tab active" data-status="active">Активные</button>
+                <button class="tab" data-status="completed">Завершенные</button>
+            </div>
+            <div id="routes-list" class="routes-list"></div>
+            <button class="btn btn-primary" style="margin-top: 16px; width: 100%;">Отправить курьеру</button>
+        </div>
+    </div>
+    
+    <div class="column">
+        <div class="map-container">
+            <div>Карта с маршрутами</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', async function() {
+        const dayInput = document.getElementById('day');
+        const ordersList = document.getElementById('orders-list');
+        const routesList = document.getElementById('routes-list');
+        const addOrderShortcut = document.getElementById('optimization-add-order');
+        const routeTabs = document.querySelectorAll('.tabs .tab');
+        const state = {
+            routes: {
+                active: [],
+                completed: []
+            },
+            selectedStatus: 'active',
+            focusOrderId: null
+        };
+        
+        const hashValue = window.location.hash.replace('#', '');
+        if (hashValue.startsWith('order=')) {
+            const [, orderId] = hashValue.split('=');
+            state.focusOrderId = orderId;
+        }
+        
+        // Устанавливаем сегодняшнюю дату
+        const today = new Date();
+        const isoDate = today.toISOString().split('T')[0];
+        dayInput.value = isoDate;
+        
+        dayInput.addEventListener('change', () => {
+            loadOrders(dayInput.value);
+            loadRoutes(state.selectedStatus, dayInput.value);
+        });
+        
+        addOrderShortcut.addEventListener('click', () => {
+            window.location.href = '/orders#add-order';
+        });
+        
+        routeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                routeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                state.selectedStatus = tab.dataset.status;
+                renderRoutes(tab.dataset.status);
+            });
+        });
+        
+        await loadOrders(dayInput.value);
+        await loadRoutes('active', dayInput.value);
+        await loadRoutes('completed', dayInput.value);
+        renderRoutes('active');
+        
+        async function loadOrders(date) {
+            ordersList.innerHTML = '<div class="list-item">Загрузка...</div>';
+            try {
+                const response = await api.get(`/api/orders?visit_date=${date}`);
+                let orders = response.orders || [];
+                if (!orders.length) {
+                    orders = getSampleOrders(date);
+                }
+                renderOrders(orders);
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                ordersList.innerHTML = '<div class="list-item">Не удалось загрузить заказы</div>';
+            }
+        }
+        
+        async function loadRoutes(status, date) {
+            routesList.innerHTML = '<div class="list-item">Загрузка маршрутов...</div>';
+            try {
+                const response = await api.get(`/api/routes?status=${status}&date=${date}`);
+                let routes = response.routes || [];
+                if (!routes.length) {
+                    routes = getSampleRoutes(status);
+                }
+                state.routes[status] = routes;
+                if (state.selectedStatus === status) {
+                    renderRoutes(status);
+                }
+            } catch (error) {
+                console.error('Error loading routes:', error);
+                if (state.selectedStatus === status) {
+                    routesList.innerHTML = '<div class="list-item">Не удалось загрузить маршруты</div>';
+                }
+            }
+        }
+        
+        function renderOrders(orders) {
+            if (!orders.length) {
+                ordersList.innerHTML = '<div class="list-item">Заказы отсутствуют</div>';
+                return;
+            }
+            ordersList.innerHTML = orders.map(order => {
+                const isFocused = state.focusOrderId && String(order.id) === String(state.focusOrderId);
+                return `
+                    <div class="list-item ${isFocused ? 'active' : ''}">
+                        <div style="display:flex; flex-direction:column;">
+                            <strong>${order.order_name || order.point_address}</strong>
+                            <span style="color:var(--text-gray); font-size:12px;">
+                                ${order.point_address || ''} · ${order.courier_name || 'Курьер не назначен'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function renderRoutes(status) {
+            const routes = state.routes[status] || [];
+            if (!routes.length) {
+                routesList.innerHTML = '<div class="list-item">Маршруты отсутствуют</div>';
+                return;
+            }
+            routesList.innerHTML = routes.map(route => {
+                const hasOrder = route.current_order && route.current_order.order_id;
+                const isFocused = hasOrder && state.focusOrderId && String(route.current_order.order_id) === String(state.focusOrderId);
+                return `
+                    <div class="list-item ${isFocused ? 'active' : ''}">
+                        <div style="display:flex; flex-direction:column; width:100%;">
+                            <strong>${route.courier_name || 'Неизвестный курьер'}</strong>
+                            <span style="color:var(--text-gray); font-size:12px;">
+                                ${route.current_order?.order_name || 'Заказ не назначен'}
+                            </span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button class="btn btn-secondary btn-small route-edit-btn" data-route-id="${route.id}">
+                                Изменить
+                            </button>
+                            <span style="font-size:12px; color:var(--text-gray);">
+                                ${route.current_order?.status_label || (status === 'active' ? 'В процессе' : 'Завершен')}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            routesList.querySelectorAll('.route-edit-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const routeId = btn.dataset.routeId;
+                    openRouteEdit(routeId);
+                });
+            });
+        }
+        
+        async function openRouteEdit(routeId) {
+            showNotification('Загрузка маршрута...', 'info');
+            try {
+                const response = await api.get(`/api/routes/${routeId}/optimize-view`);
+                console.log('Route optimization view:', response);
+                showNotification('Маршрут открыт для редактирования', 'success');
+            } catch (error) {
+                console.error('Error loading optimization view:', error);
+                showNotification('Не удалось загрузить маршрут', 'error');
+            }
+        }
+        
+        function getSampleOrders(date) {
+            return [
+                {
+                    id: 1001,
+                    order_name: 'Заказ TEST-1001',
+                    point_address: 'Москва, ул. Новая 10',
+                    courier_name: 'Азымбек Казбек',
+                    visit_date: date
+                },
+                {
+                    id: 1002,
+                    order_name: 'Заказ TEST-1002',
+                    point_address: 'Москва, ул. Ленина 12',
+                    courier_name: 'Азамат Айталиев',
+                    visit_date: date
+                }
+            ];
+        }
+        
+        function getSampleRoutes(status) {
+            const samples = {
+                active: [
+                    {
+                        id: 201,
+                        courier_id: 1,
+                        courier_name: 'Азымбек Казбек',
+                        current_order: {
+                            order_id: 1001,
+                            order_name: 'Заказ TEST-1001',
+                            status_label: 'В процессе'
+                        }
+                    },
+                    {
+                        id: 202,
+                        courier_id: 2,
+                        courier_name: 'Азамат Айталиев',
+                        current_order: {
+                            order_id: 1002,
+                            order_name: 'Заказ TEST-1002',
+                            status_label: 'В процессе'
+                        }
+                    }
+                ],
+                completed: [
+                    {
+                        id: 301,
+                        courier_id: 3,
+                        courier_name: 'Михаил Щербетов',
+                        current_order: {
+                            order_id: 998,
+                            order_name: 'Заказ TEST-0998',
+                            status_label: 'Завершен'
+                        }
+                    }
+                ]
+            };
+            return samples[status] || [];
+        }
+    });
+</script>
+{% endblock %}
+

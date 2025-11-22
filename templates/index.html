@@ -1,0 +1,756 @@
+{% extends "base.html" %}
+{% set show_menu = False %}
+
+{% block title %}Главная - yo.route{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .hero-title {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        background: linear-gradient(45deg, var(--primary-blue), #6a11cb);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 700;
+    }
+
+    .hero-subtitle {
+        font-size: 1.2rem;
+        color: var(--text-gray);
+        max-width: 600px;
+        margin: 0 auto 40px;
+        line-height: 1.6;
+    }
+
+    .cta-button {
+        display: inline-block;
+        padding: 15px 40px;
+        background: var(--primary-blue);
+        color: white;
+        border-radius: 30px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+        top: 100
+    }
+
+    .cta-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    .features-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 30px;
+        padding: 40px 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .feature-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: var(--card-shadow);
+        transition: transform 0.3s ease;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .feature-icon {
+        font-size: 2.5rem;
+        color: var(--primary-blue);
+        margin-bottom: 20px;
+    }
+
+    .feature-title {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        color: var(--text-color);
+    }
+
+    .feature-desc {
+        color: var(--text-gray);
+        line-height: 1.6;
+    }
+
+    .steps-section {
+        padding: 60px 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .section-title {
+        text-align: center;
+        font-size: 2rem;
+        margin-bottom: 50px;
+        color: var(--text-color);
+    }
+
+    .step-item {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 40px;
+    }
+
+    .step-number {
+        background: var(--primary-blue);
+        color: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 20px;
+        flex-shrink: 0;
+    }
+
+    .step-content h3 {
+        margin-bottom: 10px;
+        color: var(--text-color);
+    }
+
+    .step-content p {
+        color: var(--text-gray);
+    }
+
+    /* Animation Classes */
+    .animate-on-scroll {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+
+    .animate-on-scroll.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* Staggered delays for grid items */
+    .feature-card:nth-child(1) {
+        transition-delay: 0.1s;
+    }
+
+    .feature-card:nth-child(2) {
+        transition-delay: 0.2s;
+    }
+
+    .feature-card:nth-child(3) {
+        transition-delay: 0.3s;
+    }
+
+    /* Specific animations */
+    .slide-in-left {
+        transform: translateX(-50px);
+    }
+
+    .slide-in-right {
+        transform: translateX(50px);
+    }
+
+    .slide-in-left.is-visible,
+    .slide-in-right.is-visible {
+        transform: translateX(0);
+    }
+
+    .why-us-section {
+        padding: 80px 20px;
+        margin: 40px 0;
+    }
+
+    .why-us-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 30px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .why-us-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: var(--card-shadow);
+        transition: transform 0.3s ease;
+        text-align: center;
+    }
+
+    .why-us-card:hover {
+        transform: translateY(-5px);
+    }
+
+    /* Staggered delays for why-us items */
+    .why-us-card:nth-child(1) {
+        transition-delay: 0.1s;
+    }
+
+    .why-us-card:nth-child(2) {
+        transition-delay: 0.2s;
+    }
+
+    .why-us-card:nth-child(3) {
+        transition-delay: 0.3s;
+    }
+
+    .why-us-card:nth-child(4) {
+        transition-delay: 0.4s;
+    }
+
+    .why-us-card:nth-child(5) {
+        transition-delay: 0.5s;
+    }
+
+    .why-us-icon {
+        font-size: 2.5rem;
+        color: var(--primary-blue);
+        margin-bottom: 15px;
+    }
+
+    .why-us-card h3 {
+        font-size: 1.3rem;
+        margin-bottom: 10px;
+        color: var(--text-color);
+    }
+
+    .why-us-card p {
+        color: var(--text-gray);
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    /* Use Cases Section */
+    .use-cases-section {
+        padding: 60px 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .use-cases-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 30px;
+    }
+
+    @media (max-width: 1024px) {
+        .use-cases-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .use-cases-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .use-case-card {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        border: 1px solid #eee;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .use-case-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border-color: var(--primary-blue);
+    }
+
+    .use-case-icon {
+        font-size: 2rem;
+        color: var(--primary-blue);
+        background: #f0f7ff;
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* Stats Section */
+    .stats-section {
+        padding: 60px 20px;
+        margin: 40px 0;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 30px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .stat-card {
+        background: var(--card-bg);
+        padding: 40px 20px;
+        border-radius: 20px;
+        box-shadow: var(--card-shadow);
+        transition: transform 0.3s ease;
+        text-align: center;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-number {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 10px;
+        color: var(--primary-blue);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 1.1rem;
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Staggered delays for stat items */
+    .stat-card:nth-child(1) {
+        transition-delay: 0.1s;
+    }
+
+    .stat-card:nth-child(2) {
+        transition-delay: 0.2s;
+    }
+
+    .stat-card:nth-child(3) {
+        transition-delay: 0.3s;
+    }
+
+    /* CTA Footer */
+    .cta-footer {
+        text-align: center;
+        color: var(--text-gray);
+        padding: 100px 20px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .cta-footer h2 {
+        font-size: 2.5rem;
+        margin-bottom: 20px;
+        color: var(--text-color);
+    }
+
+    /* Pill Nav */
+    .pill-nav {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        padding: 5px;
+        border-radius: 50px;
+        display: flex;
+        gap: 5px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .nav-item {
+        text-decoration: none;
+        color: var(--text-gray);
+        padding: 10px 20px;
+        border-radius: 30px;
+        font-size: 0.95rem;
+        font-weight: 500;
+        position: relative;
+        z-index: 2;
+        transition: color 0.3s ease;
+    }
+
+    .nav-item.active {
+        color: white;
+    }
+
+    .nav-indicator {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        height: calc(100% - 10px);
+        background: var(--primary-blue);
+        border-radius: 30px;
+        z-index: 1;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Hero Image 3D Tilt */
+    .hero-image-container {
+        margin-top: 50px;
+        margin-bottom: 80px;
+        padding: 0 20px;
+        display: flex;
+        justify-content: center;
+        perspective: 1000px;
+        transform-style: preserve-3d;
+    }
+
+    .mockup-window {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+        max-width: 1200px;
+        width: 100%;
+        overflow: hidden;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        transition: transform 0.1s ease;
+        transform-style: preserve-3d;
+    }
+
+    .mockup-header {
+        background: #f1f3f5;
+        padding: 10px 15px;
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .red {
+        background: #ff5f56;
+    }
+
+    .yellow {
+        background: #ffbd2e;
+    }
+
+    .green {
+        background: #27c93f;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="pill-nav">
+    <div class="nav-indicator"></div>
+    <a href="#hero" class="nav-item active">Главная</a>
+    <a href="#features" class="nav-item">Возможности</a>
+    <a href="#use-cases" class="nav-item">Для кого</a>
+    <a href="#why-us" class="nav-item">Преимущества</a>
+    <a href="#steps" class="nav-item">Как работает</a>
+    <a href="#stats" class="nav-item">Цифры</a>
+</nav>
+
+<div id="hero" class="hero-section animate-on-scroll">
+    <h1 class="hero-title">yo.route</h1>
+    <p class="hero-subtitle">
+        Интеллектуальная система маршрутизации.
+        Оптимизируйте маршруты, управляйте курьерами и отслеживайте заказы в реальном времени.
+    </p>
+    <a href="/login" class="cta-button">Начать работу</a>
+</div>
+
+<div class="hero-image-container animate-on-scroll">
+    <div class="mockup-window">
+        <div class="mockup-header">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+        </div>
+        <div class="mockup-content">
+            <img src="/static/img/dashboard-preview.jpg" alt="Интерфейс yo.route"
+                style="width: 100%; border-radius: 0 0 10px 10px;">
+        </div>
+    </div>
+</div>
+
+<div id="features" class="features-section">
+    <div class="feature-card animate-on-scroll">
+        <div class="feature-icon">
+            <i class="fi fi-sr-rocket-lunch"></i>
+        </div>
+        <h3 class="feature-title">Умная оптимизация</h3>
+        <p class="feature-desc">
+            Автоматическое построение оптимальных маршрутов с учетом пробок, временных окон и вместимости
+            транспорта.
+        </p>
+    </div>
+    <div class="feature-card animate-on-scroll">
+        <div class="feature-icon">
+            <i class="fi fi-sr-map-marker-home"></i>
+        </div>
+        <h3 class="feature-title">Управление точками</h3>
+        <p class="feature-desc">
+            Удобная база адресов и клиентов. Быстрое добавление и редактирование точек доставки.
+        </p>
+    </div>
+    <div class="feature-card animate-on-scroll">
+        <div class="feature-icon">
+            <i class="fi fi-sr-users-alt"></i>
+        </div>
+        <h3 class="feature-title">Контроль курьеров</h3>
+        <p class="feature-desc">
+            Отслеживание местоположения курьеров, статусов доставки и эффективности работы в реальном
+            времени.
+        </p>
+    </div>
+</div>
+
+<div id="use-cases" class="use-cases-section">
+    <h2 class="section-title animate-on-scroll">Для кого это?</h2>
+    <div class="use-cases-grid">
+        <div class="use-case-card animate-on-scroll">
+            <div class="use-case-icon"><i class="fi fi-sr-pizza-slice"></i></div>
+            <div>
+                <h3>Доставка еды</h3>
+                <p style="margin:0; color:var(--text-gray); font-size:0.9rem;">Пиццерии, суши, рестораны</p>
+            </div>
+        </div>
+        <div class="use-case-card animate-on-scroll">
+            <div class="use-case-icon"><i class="fi fi-sr-shopping-bag"></i></div>
+            <div>
+                <h3>Интернет-магазины</h3>
+                <p style="margin:0; color:var(--text-gray); font-size:0.9rem;">Доставка товаров, одежды,
+                    техники</p>
+            </div>
+        </div>
+        <div class="use-case-card animate-on-scroll">
+            <div class="use-case-icon"><i class="fi fi-sr-truck-moving"></i></div>
+            <div>
+                <h3>Логистика</h3>
+                <p style="margin:0; color:var(--text-gray); font-size:0.9rem;">Транспортные компании,
+                    грузоперевозки</p>
+            </div>
+        </div>
+        <div class="use-case-card animate-on-scroll">
+            <div class="use-case-icon"><i class="fi fi-sr-broom"></i></div>
+            <div>
+                <h3>Сервисные службы</h3>
+                <p style="margin:0; color:var(--text-gray); font-size:0.9rem;">Клининг, ремонт, выездные
+                    мастера</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="why-us" class="why-us-section">
+    <h2 class="section-title animate-on-scroll">Почему выбирают нас</h2>
+    <div class="why-us-grid">
+        <div class="why-us-card animate-on-scroll">
+            <div class="why-us-icon"><i class="fi fi-sr-wallet"></i></div>
+            <h3>Выгодные тарифы</h3>
+            <p>Самые выгодные тарифы для малого бизнеса. Платите только за то, что используете.</p>
+        </div>
+        <div class="why-us-card animate-on-scroll">
+            <div class="why-us-icon"><i class="fi fi-sr-settings-sliders"></i></div>
+            <h3>Простая интеграция</h3>
+            <p>Легко внедряется в ваши рабочие процессы. Начните работать сразу после регистрации.</p>
+        </div>
+        <div class="why-us-card animate-on-scroll">
+            <div class="why-us-icon"><i class="fi fi-sr-chart-line-up"></i></div>
+            <h3>Окупаемость</h3>
+            <p>Быстрая окупаемость вложений за счет оптимизации логистики и сокращения расходов.</p>
+        </div>
+        <div class="why-us-card animate-on-scroll">
+            <div class="why-us-icon"><i class="fi fi-sr-time-fast"></i></div>
+            <h3>Быстрое планирование</h3>
+            <p>Мгновенное построение оптимальных маршрутов даже для большого количества заказов.</p>
+        </div>
+        <div class="why-us-card animate-on-scroll">
+            <div class="why-us-icon"><i class="fi fi-sr-shield-check"></i></div>
+            <h3>Бесперебойная работа</h3>
+            <p>Гарантируем стабильность работы сервиса и сохранность ваших данных.</p>
+        </div>
+    </div>
+</div>
+
+<div id="steps" class="steps-section">
+    <h2 class="section-title animate-on-scroll">Как это работает</h2>
+
+    <div class="step-item animate-on-scroll slide-in-left">
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h3>Регистрация и настройка</h3>
+            <p>Создайте аккаунт компании, добавьте курьеров и настройте параметры логистики.</p>
+        </div>
+    </div>
+
+    <div class="step-item animate-on-scroll slide-in-right">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h3>Импорт заказов</h3>
+            <p>Загрузите список заказов вручную или импортируйте из Excel. Система автоматически распределит
+                их.</p>
+        </div>
+    </div>
+
+    <div class="step-item animate-on-scroll slide-in-left">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h3>Построение маршрутов</h3>
+            <p>Запустите оптимизацию. Алгоритм создаст эффективные маршруты для каждого курьера.</p>
+        </div>
+    </div>
+
+    <div class="step-item animate-on-scroll slide-in-right">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h3>Контроль исполнения</h3>
+            <p>Следите за выполнением заказов и получайте отчеты о доставке.</p>
+        </div>
+    </div>
+</div>
+
+<div id="stats" class="stats-section">
+    <div class="stats-grid">
+        <div class="stat-card animate-on-scroll">
+            <div class="stat-number">-30%</div>
+            <div class="stat-label">Расходов на логистику</div>
+        </div>
+        <div class="stat-card animate-on-scroll">
+            <div class="stat-number">2x</div>
+            <div class="stat-label">Ускорение планирования</div>
+        </div>
+        <div class="stat-card animate-on-scroll">
+            <div class="stat-number">100%</div>
+            <div class="stat-label">Контроль над курьерами</div>
+        </div>
+    </div>
+</div>
+
+<div class="cta-footer animate-on-scroll">
+    <h2>Готовы оптимизировать логистику?</h2>
+    <p>Попробуйте yo.route бесплатно и оцените преимущества уже сегодня.</p>
+    <a href="/registration" class="cta-button">Попробовать бесплатно</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target); // Animate only once
+                }
+            });
+        }, observerOptions);
+
+        const elements = document.querySelectorAll('.animate-on-scroll');
+        elements.forEach(el => observer.observe(el));
+
+        // Pill Nav Logic
+        const navItems = document.querySelectorAll('.nav-item');
+        const indicator = document.querySelector('.nav-indicator');
+        const sections = document.querySelectorAll('div[id]');
+
+        function updateIndicator(element) {
+            if (!element) return;
+            indicator.style.width = `${element.offsetWidth}px`;
+            indicator.style.left = `${element.offsetLeft}px`;
+        }
+
+        // Initial position
+        if (navItems.length > 0) {
+            updateIndicator(navItems[0]);
+        }
+
+        navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = item.getAttribute('href');
+                const targetSection = document.querySelector(targetId);
+                if (targetSection) {
+                    targetSection.scrollIntoView({ behavior: 'smooth' });
+                }
+
+                // Update active state manually for immediate feedback
+                navItems.forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+                updateIndicator(item);
+            });
+        });
+
+        // Scroll Spy Logic
+        const nav = document.querySelector('.pill-nav');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (scrollY >= (sectionTop - 300)) { // Adjusted offset for better trigger
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href').includes(current)) {
+                    item.classList.add('active');
+                    updateIndicator(item);
+                }
+            });
+        });
+
+        // 3D Tilt Animation for Hero Image
+        const heroContainer = document.querySelector('.hero-image-container');
+        const mockupWindow = document.querySelector('.mockup-window');
+
+        if (heroContainer && mockupWindow) {
+            heroContainer.addEventListener('mousemove', (e) => {
+                const rect = heroContainer.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Calculate rotation based on mouse position relative to center
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+
+                const rotateX = ((y - centerY) / centerY) * -5; // Max 5deg rotation
+                const rotateY = ((x - centerX) / centerX) * 5; // Max 5deg rotation
+
+                mockupWindow.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            heroContainer.addEventListener('mouseleave', () => {
+                mockupWindow.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+                mockupWindow.style.transition = 'transform 0.5s ease'; // Slower return
+            });
+
+            heroContainer.addEventListener('mouseenter', () => {
+                mockupWindow.style.transition = 'transform 0.1s ease'; // Fast response
+            });
+        }
+    });
+</script>
+{% endblock %}

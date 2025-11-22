@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+{% set show_menu = True %}
+
+{% block title %}Заказы - yo.route{% endblock %}
+
+{% block content %}
+<!-- Основная страница со списком заказов -->
+<div class="two-column" id="orders-container" style="max-width: 100%;">
+    <div class="column" id="orders-list-page" style="padding-bottom: 80px;">
+        <div class="page-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h1 class="page-title"><i class="fi fi-sr-clipboard-list" style="color: var(--primary-blue);"></i>
+                    Заказы</h1>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <div style="position: relative; width: 300px;">
+                    <input type="text" id="search-orders" class="form-input" placeholder="Поиск"
+                        style="padding-left: 40px;">
+                    <span
+                        style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-gray);">🔍</span>
+                </div>
+                <button class="btn btn-secondary" id="import-excel-btn"><i class="fi fi-sr-file-excel"></i> Импорт
+                    Excel</button>
+                <button class="btn btn-primary" id="add-order-btn"><i class="fi fi-sr-plus"></i> Добавить заказ</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Название заказа</th>
+                        <th>Адрес получателя</th>
+                        <th>Дата доставки</th>
+                        <th>Время доставки</th>
+                        <th>Статус</th>
+                        <th>Курьер</th>
+                        <th>Компания</th>
+                        <th>Получатель</th>
+                        <th>Телефон получателя</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                    <tr data-order-row>
+                        <td><input type="radio" name="selected_order" value="1" data-order-name="Заказ TEST-1001"></td>
+                        <td><strong>Заказ TEST-1001</strong></td>
+                        <td>Москва ул. Пушкина 67</td>
+                        <td>29.09.2025</td>
+                        <td>15.00-19.00</td>
+                        <td><span class="status-badge status-planned">Запланирован</span></td>
+                        <td>Азымбек Казбек</td>
+                        <td>AlexusPrime</td>
+                        <td>Алексей Н.</td>
+                        <td>+79995553534</td>
+                    </tr>
+                    <tr data-order-row>
+                        <td><input type="radio" name="selected_order" value="2" data-order-name="Заказ TEST-1002"></td>
+                        <td><strong>Заказ TEST-1002</strong></td>
+                        <td>Москва ул. Ленина 12</td>
+                        <td>30.09.2025</td>
+                        <td>10.00-14.00</td>
+                        <td><span class="status-badge status-completed">Завершен</span></td>
+                        <td>Азамат Айталиев</td>
+                        <td>TechCorp</td>
+                        <td>Иван П.</td>
+                        <td>+79991234567</td>
+                    </tr>
+                    <tr data-order-row>
+                        <td><input type="radio" name="selected_order" value="3" data-order-name="Заказ TEST-1003"></td>
+                        <td><strong>Заказ TEST-1003</strong></td>
+                        <td>Москва пр. Мира 45</td>
+                        <td>01.10.2025</td>
+                        <td>12.00-16.00</td>
+                        <td><span class="status-badge status-in-progress">Выполняется</span></td>
+                        <td>Михаил Щербетов</td>
+                        <td>DeliveryPro</td>
+                        <td>Мария С.</td>
+                        <td>+79997654321</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Форма создания заказа (скрыта по умолчанию, открывается справа) -->
+    <div class="column" id="create-order-column" style="display: none; opacity: 0;">
+        <div class="page-header">
+            <button class="back-button" id="close-create-order-btn">←</button>
+            <h2 class="page-title" style="font-size: 20px;">Создание заказа</h2>
+        </div>
+
+        <form action="/api/orders" method="POST" id="create-order-form">
+            <div class="form-group">
+                <label class="form-label" for="order_name">Название заказа</label>
+                <input type="text" id="order_name" name="order_name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="destination_point">Пункт назначения</label>
+                <input type="text" id="destination_point" name="destination_point" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="point_id">Точка отправления</label>
+                <div id="point-selector">
+                    <select id="point_id" name="point_id" class="form-select" required>
+                        <option value="">Загрузка точек...</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-small" id="manage-points-link"
+                        style="margin-top: 8px;">
+                        + Создать точку во вкладке «Точки отправки»
+                    </button>
+                </div>
+                <small style="display:block; color:var(--text-gray); margin-top:4px;">
+                    Управление точками теперь доступно во вкладке «Точки отправки»
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="visit_date">Дата посещения точки</label>
+                <input type="date" id="visit_date" name="visit_date" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="visit_time">Время посещения точки</label>
+                <input type="time" id="visit_time" name="visit_time" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="time_at_point">Время на посещение точки</label>
+                <input type="number" id="time_at_point" name="time_at_point" class="form-input" placeholder="минуты"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="recipient_name">ФИО</label>
+                <input type="text" id="recipient_name" name="recipient_name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="recipient_phone">Телефон получателя</label>
+                <input type="tel" id="recipient_phone" name="recipient_phone" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="courier_id">Закрепить курьера</label>
+                <select id="courier_id" name="courier_id" class="form-select" required>
+                    <option value="">Выберите курьера</option>
+                </select>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Курьер получит уведомление после сохранения заказа
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="comment">Комментарий (для курьера)</label>
+                <textarea id="comment" name="comment" class="form-textarea" rows="3"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Создать</button>
+        </form>
+
+        <div class="map-container" style="margin-top: 24px; min-height: 400px;">
+            <div>Визуализация пункта назначения</div>
+        </div>
+    </div>
+</div>
+<!-- Панель действий для выбранных заказов -->
+<div id="selected-orders-panel" class="selection-panel">
+    <div class="selection-panel-content">
+        <span id="selected-count" class="selection-panel-text">Выбран 1 заказ</span>
+        <button id="clear-selection" class="selection-panel-close">
+            <i class="fi fi-sr-cross-small"></i>
+        </button>
+    </div>
+    <div class="selection-panel-actions">
+        <button class="btn btn-secondary" id="delete-orders-btn">
+            <i class="fi fi-sr-trash"></i> Удалить
+        </button>
+        <button class="btn btn-secondary" id="change-status-btn">
+            <i class="fi fi-sr-menu-dots-vertical"></i> Статус
+        </button>
+        <button class="btn btn-secondary" id="edit-order-btn">
+            <i class="fi fi-sr-edit"></i> Изменить
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', async function () {
+        const ordersContainer = document.getElementById('orders-container');
+        const createOrderColumn = document.getElementById('create-order-column');
+        const addOrderButtons = document.querySelectorAll('#add-order-btn');
+        const closeCreateOrderBtn = document.getElementById('close-create-order-btn');
+        const selectedOrdersPanel = document.getElementById('selected-orders-panel');
+        const selectedCount = document.getElementById('selected-count');
+        const clearSelection = document.getElementById('clear-selection');
+        const deleteOrdersBtn = document.getElementById('delete-orders-btn');
+        const changeStatusBtn = document.getElementById('change-status-btn');
+        const editOrderBtn = document.getElementById('edit-order-btn');
+        const createOrderForm = document.getElementById('create-order-form');
+        const ordersTableBody = document.getElementById('orders-table-body');
+        const searchInput = document.getElementById('search-orders');
+
+        const courierSelect = document.getElementById('courier_id');
+        const pointSelect = document.getElementById('point_id');
+        const managePointsLink = document.getElementById('manage-points-link');
+
+        try {
+            const response = await api.get('/api/orders');
+            const loadedOrders = (response.orders || []).length ? response.orders : getSampleOrders();
+            updateOrdersTable(loadedOrders);
+        } catch (error) {
+            console.error('Error loading orders:', error);
+            updateOrdersTable(getSampleOrders());
+        }
+
+        await Promise.all([loadCouriers(), loadPoints()]);
+
+        async function loadCouriers() {
+            if (!courierSelect) return;
+            try {
+                const { couriers = [] } = await api.get('/api/couriers');
+                if (couriers.length === 0) {
+                    courierSelect.innerHTML = '<option value="">Нет доступных курьеров</option>';
+                    courierSelect.disabled = true;
+                    return;
+                }
+                courierSelect.disabled = false;
+                courierSelect.innerHTML = '<option value="">Выберите курьера</option>' +
+                    couriers.map(courier => `<option value="${courier.id}">${courier.full_name}</option>`).join('');
+            } catch (error) {
+                console.error('Error loading couriers:', error);
+                courierSelect.innerHTML = '<option value="">Не удалось загрузить курьеров</option>';
+                courierSelect.disabled = true;
+            }
+        }
+
+        async function loadPoints() {
+            if (!pointSelect) return;
+            try {
+                let { points = [] } = await api.get('/api/points');
+                if (!points.length) {
+                    points = getSamplePoints();
+                }
+                pointSelect.disabled = false;
+                pointSelect.innerHTML = '<option value="">Выберите точку</option>' +
+                    points.map(point => {
+                        const prefix = point.is_primary ? '★ ' : '';
+                        return `<option value="${point.id}">${prefix}${point.address}</option>`;
+                    }).join('');
+            } catch (error) {
+                console.error('Error loading points:', error);
+                pointSelect.innerHTML = '<option value="">Не удалось загрузить точки</option>';
+                pointSelect.disabled = true;
+            }
+        }
+
+        managePointsLink?.addEventListener('click', () => {
+            window.location.href = '/points#add-point';
+        });
+
+        function openCreateOrderForm() {
+            createOrderColumn.style.display = 'block';
+            ordersContainer.classList.add('show-add-form');
+            setTimeout(() => {
+                createOrderColumn.style.opacity = '1';
+            }, 10);
+        }
+
+        addOrderButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                openCreateOrderForm();
+            });
+        });
+
+        if (window.location.hash === '#add-order') {
+            openCreateOrderForm();
+        }
+        window.addEventListener('hashchange', () => {
+            if (window.location.hash === '#add-order') {
+                openCreateOrderForm();
+            }
+        });
+
+        closeCreateOrderBtn.addEventListener('click', function () {
+            closeCreateOrderForm();
+        });
+
+        function closeCreateOrderForm() {
+            createOrderColumn.style.opacity = '0';
+            setTimeout(() => {
+                createOrderColumn.style.display = 'none';
+                ordersContainer.classList.remove('show-add-form');
+                createOrderForm.reset();
+                if (window.location.hash === '#add-order') {
+                    history.replaceState(null, '', window.location.pathname);
+                }
+            }, 300);
+        }
+
+        function updateSelectedPanel() {
+            const selected = document.querySelectorAll('input[name="selected_order"]:checked');
+            if (selected.length > 0) {
+                const preview = selected[0].getAttribute('data-order-name');
+                const extra = selected.length > 1 ? ` и еще ${selected.length - 1}` : '';
+                selectedCount.textContent = `Выбрано ${selected.length}: ${preview}${extra}`;
+                selectedOrdersPanel.classList.add('active');
+                // selectedOrdersPanel.style.display = 'block'; // Removed inline style manipulation
+            } else {
+                selectedOrdersPanel.classList.remove('active');
+                // setTimeout(() => { selectedOrdersPanel.style.display = 'none'; }, 300); // Handled by CSS opacity
+            }
+        }
+
+        function updateRadioButtons() {
+            const newRadioButtons = document.querySelectorAll('input[name="selected_order"]');
+            newRadioButtons.forEach(radio => {
+                radio.addEventListener('change', function () {
+                    updateSelectedPanel();
+                });
+            });
+        }
+
+        clearSelection.addEventListener('click', function () {
+            document.querySelectorAll('input[name="selected_order"]').forEach(radio => radio.checked = false);
+            updateSelectedPanel();
+        });
+
+        deleteOrdersBtn.addEventListener('click', async function () {
+            const selected = Array.from(document.querySelectorAll('input[name="selected_order"]:checked'))
+                .map(radio => radio.value);
+
+            if (selected.length === 0) return;
+
+            if (confirm(`Удалить ${selected.length} ${selected.length === 1 ? 'заказ' : 'заказов'}?`)) {
+                try {
+                    const response = await fetch('/api/orders/batch', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ ids: selected })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        for (const id of selected) {
+                            const row = document.querySelector(`input[value="${id}"]`)?.closest('tr');
+                            if (row) row.remove();
+                        }
+                        showNotification('Заказы удалены', 'success');
+                        updateSelectedPanel();
+                        updateRadioButtons();
+                    } else {
+                        showNotification('Ошибка при удалении', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Ошибка соединения с сервером', 'error');
+                }
+            }
+        });
+
+        changeStatusBtn.addEventListener('click', function () {
+            alert('Выбор статуса (будет реализовано)');
+        });
+
+        editOrderBtn.addEventListener('click', function () {
+            const selected = document.querySelector('input[name="selected_order"]:checked');
+            if (!selected) {
+                showNotification('Выберите заказ для редактирования', 'info');
+                return;
+            }
+
+            // Open the create/edit form
+            openCreateOrderForm();
+            showNotification('Редактирование заказа (будет реализовано)', 'info');
+        });
+
+        createOrderForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification('Заказ успешно создан', 'success');
+                    const redirectToOptimization = () => {
+                        const orderId = result.id || '';
+                        if (orderId) {
+                            window.location.href = `/optimization#order=${orderId}`;
+                        } else {
+                            window.location.href = '/optimization';
+                        }
+                    };
+                    setTimeout(() => {
+                        closeCreateOrderForm();
+                        redirectToOptimization();
+                    }, 600);
+                    updateRadioButtons();
+                } else {
+                    showNotification(result.message || 'Ошибка при создании заказа', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Ошибка соединения с сервером', 'error');
+            }
+        });
+
+        searchInput.addEventListener('input', function () {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#orders-table-body tr');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        updateSelectedPanel();
+
+        function updateOrdersTable(orders = []) {
+            if (!ordersTableBody) return;
+            if (!orders.length) {
+                ordersTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="10" style="text-align:center; padding:24px; color: var(--text-gray);">
+                            Заказы отсутствуют
+                        </td>
+                    </tr>
+                `;
+                updateRadioButtons();
+                updateSelectedPanel();
+                return;
+            }
+            ordersTableBody.innerHTML = orders.map(order => {
+                const orderId = order.id || `temp-${Math.random().toString(36).slice(2)}`;
+                const orderName = order.order_name || `Заказ #${orderId}`;
+                const address = order.destination_point || order.point_address || 'Адрес не указан';
+                const visitDate = order.visit_date || '—';
+                const visitTime = order.visit_time || '—';
+                const courierName = order.courier_name || 'Курьер не назначен';
+                const company = order.company || '—';
+                const recipient = order.recipient_name || '—';
+                const recipientPhone = order.recipient_phone || '—';
+                const statusBadge = getStatusBadge(order.status);
+
+                return `
+                    <tr data-order-row>
+                        <td><input type="radio" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
+                        <td><strong>${orderName}</strong></td>
+                        <td>${address}</td>
+                        <td>${visitDate}</td>
+                        <td>${visitTime}</td>
+                        <td>${statusBadge}</td>
+                        <td>${courierName}</td>
+                        <td>${company}</td>
+                        <td>${recipient}</td>
+                        <td>${recipientPhone}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            updateRadioButtons();
+            updateSelectedPanel();
+        }
+
+        function getStatusBadge(status = 'planned') {
+            const dictionary = {
+                planned: { text: 'Запланирован', className: 'status-planned' },
+                in_progress: { text: 'Выполняется', className: 'status-in-progress' },
+                completed: { text: 'Завершен', className: 'status-completed' }
+            };
+            const { text, className } = dictionary[status] || dictionary.planned;
+            return `<span class="status-badge ${className}">${text}</span>`;
+        }
+
+        function getSampleOrders() {
+            return [
+                {
+                    id: 1001,
+                    order_name: 'Заказ TEST-1001',
+                    destination_point: 'Москва ул. Пушкина 67',
+                    visit_date: '2025-09-29',
+                    visit_time: '15:00-19:00',
+                    status: 'planned',
+                    courier_name: 'Азымбек Казбек',
+                    company: 'AlexusPrime',
+                    recipient_name: 'Алексей Н.',
+                    recipient_phone: '+79995553534'
+                },
+                {
+                    id: 1002,
+                    order_name: 'Заказ TEST-1002',
+                    destination_point: 'Москва ул. Ленина 12',
+                    visit_date: '2025-09-30',
+                    visit_time: '10:00-14:00',
+                    status: 'completed',
+                    courier_name: 'Азамат Айталиев',
+                    company: 'TechCorp',
+                    recipient_name: 'Иван П.',
+                    recipient_phone: '+79991234567'
+                },
+                {
+                    id: 1003,
+                    order_name: 'Заказ TEST-1003',
+                    destination_point: 'Москва пр. Мира 45',
+                    visit_date: '2025-10-01',
+                    visit_time: '12:00-16:00',
+                    status: 'in_progress',
+                    courier_name: 'Михаил Щербетов',
+                    company: 'DeliveryPro',
+                    recipient_name: 'Мария С.',
+                    recipient_phone: '+79997654321'
+                }
+            ];
+        }
+
+        function getSamplePoints() {
+            return [
+                { id: 1, address: 'Москва, ул. Оршанская 13', is_primary: true },
+                { id: 2, address: 'Химки, ул. Германа Титова 3', is_primary: false }
+            ];
+        }
+    });
+</script>
+{% endblock %}

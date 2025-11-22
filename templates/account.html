@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% set show_menu = True %}
+
+{% block title %}Аккаунт - yo.route{% endblock %}
+
+{% block content %}
+<div class="form-container" style="max-width: 840px;">
+    <div class="page-header">
+        <h1 class="page-title"><i class="fi fi-sr-user" style="color: var(--primary-blue);"></i> Настройки аккаунта</h1>
+    </div>
+
+    <div class="list-section">
+        <h2 class="section-title"><i class="fi fi-sr-building"></i> Профиль компании</h2>
+        <form id="account-profile-form" action="/api/account/profile" data-method="PUT">
+            <div class="form-group">
+                <label class="form-label" for="profile_company_name">Название компании *</label>
+                <input type="text" id="profile_company_name" name="company_name" class="form-input" required
+                    placeholder="ООО «Пример»">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="profile_email">Рабочая почта *</label>
+                <input type="email" id="profile_email" name="email" class="form-input" required
+                    placeholder="logistics@example.com">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="profile_phone">Контактный телефон</label>
+                <input type="tel" id="profile_phone" name="phone" class="form-input" placeholder="+7 (999) 999-99-99">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="profile_activity">Сфера деятельности</label>
+                <input type="text" id="profile_activity" name="activity" class="form-input"
+                    placeholder="Доставка, eCommerce...">
+            </div>
+
+            <button type="submit" class="btn btn-primary"><i class="fi fi-sr-disk"></i> Сохранить</button>
+        </form>
+    </div>
+
+    <div class="list-section">
+        <h2 class="section-title"><i class="fi fi-sr-shield-check"></i> Безопасность</h2>
+        <form id="account-security-form" action="/api/account/security" data-method="PUT">
+            <div class="form-group">
+                <label class="form-label" for="current_password">Текущий пароль</label>
+                <input type="password" id="current_password" name="current_password" class="form-input"
+                    placeholder="Введите текущий пароль">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="new_password">Новый пароль</label>
+                <input type="password" id="new_password" name="new_password" class="form-input"
+                    placeholder="Введите новый пароль">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="confirm_password">Повторите новый пароль</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-input"
+                    placeholder="Повторите новый пароль">
+            </div>
+
+            <button type="submit" class="btn btn-secondary"><i class="fi fi-sr-refresh"></i> Обновить пароль</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', async function () {
+        const profileForm = document.getElementById('account-profile-form');
+
+        try {
+            const response = await api.get('/api/account/profile');
+            if (response.profile) {
+                const profile = response.profile;
+                profileForm.querySelector('#profile_company_name').value = profile.company_name || '';
+                profileForm.querySelector('#profile_email').value = profile.email || '';
+                profileForm.querySelector('#profile_phone').value = profile.phone || '';
+                profileForm.querySelector('#profile_activity').value = profile.activity || '';
+            }
+        } catch (error) {
+            console.error('Error loading account profile:', error);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% set show_menu = False %}
+
+{% block title %}Вход - yo.route{% endblock %}
+
+{% block content %}
+<div id="welcome-text" class="welcome-text-container" style="text-align: center; margin-bottom: 40px;">
+    <div id="text-type" class="text-type"></div>
+</div>
+
+<div class="form-container">
+    <div class="logo" style="text-align: center; margin-bottom: 32px; border: none; padding: 0;">
+        yo.route {}
+    </div>
+    
+    <h1 class="page-title" style="text-align: center; margin-bottom: 32px;">Вход</h1>
+    
+    <form action="/api/login" method="POST" data-redirect="/orders" id="login-form">
+        <div class="form-group">
+            <label class="form-label" for="email">Почта</label>
+            <input type="email" id="email" name="email" class="form-input" placeholder="Введите почту" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" for="password">Пароль</label>
+            <input type="password" id="password" name="password" class="form-input" placeholder="Введите пароль" required>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 16px;">
+            <div class="checkbox-group" style="margin-bottom: 0;">
+                <input type="checkbox" id="remember" name="remember" class="checkbox-input">
+                <label for="remember" class="checkbox-label">Запомнить меня</label>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Войти</button>
+        
+        <div style="text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+            <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 12px;">
+                Нет аккаунта?
+            </p>
+            <a href="/registration" style="color: var(--primary-blue); text-decoration: none; font-weight: 500; font-size: 14px;">
+                Зарегистрироваться
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // TextType Component (vanilla JS version)
+    class TextType {
+        constructor(element, options = {}) {
+            this.element = element;
+            this.text = Array.isArray(options.text) ? options.text : [options.text || ''];
+            this.typingSpeed = options.typingSpeed || 50;
+            this.initialDelay = options.initialDelay || 0;
+            this.pauseDuration = options.pauseDuration || 2000;
+            this.deletingSpeed = options.deletingSpeed || 30;
+            this.loop = options.loop !== undefined ? options.loop : true;
+            this.showCursor = options.showCursor !== undefined ? options.showCursor : true;
+            this.hideCursorWhileTyping = options.hideCursorWhileTyping || false;
+            this.cursorCharacter = options.cursorCharacter || '|';
+            this.cursorBlinkDuration = options.cursorBlinkDuration || 0.5;
+            this.textColors = options.textColors || [];
+            
+            this.displayedText = '';
+            this.currentCharIndex = 0;
+            this.isDeleting = false;
+            this.currentTextIndex = 0;
+            this.timeout = null;
+            
+            this.init();
+        }
+        
+        init() {
+            this.element.innerHTML = '<span class="text-type__content"></span>' + 
+                (this.showCursor ? `<span class="text-type__cursor">${this.cursorCharacter}</span>` : '');
+            
+            this.contentSpan = this.element.querySelector('.text-type__content');
+            this.cursorSpan = this.element.querySelector('.text-type__cursor');
+            
+            if (this.cursorSpan) {
+                this.cursorSpan.style.animation = `text-type-blink ${this.cursorBlinkDuration}s infinite`;
+            }
+            
+            if (this.initialDelay > 0) {
+                setTimeout(() => this.animate(), this.initialDelay);
+            } else {
+                this.animate();
+            }
+        }
+        
+        animate() {
+            if (this.timeout) {
+                clearTimeout(this.timeout);
+            }
+            
+            const currentText = this.text[this.currentTextIndex];
+            
+            if (this.isDeleting) {
+                if (this.displayedText === '') {
+                    this.isDeleting = false;
+                    this.currentTextIndex = (this.currentTextIndex + 1) % this.text.length;
+                    this.currentCharIndex = 0;
+                    this.timeout = setTimeout(() => this.animate(), this.pauseDuration);
+                    return;
+                }
+                
+                this.displayedText = this.displayedText.slice(0, -1);
+                this.updateDisplay();
+                this.timeout = setTimeout(() => this.animate(), this.deletingSpeed);
+            } else {
+                if (this.currentCharIndex < currentText.length) {
+                    this.displayedText += currentText[this.currentCharIndex];
+                    this.currentCharIndex++;
+                    this.updateDisplay();
+                    this.timeout = setTimeout(() => this.animate(), this.typingSpeed);
+                } else {
+                    if (!this.loop && this.currentTextIndex === this.text.length - 1) {
+                        return;
+                    }
+                    this.timeout = setTimeout(() => {
+                        this.isDeleting = true;
+                        this.animate();
+                    }, this.pauseDuration);
+                }
+            }
+        }
+        
+        updateDisplay() {
+            if (this.contentSpan) {
+                const color = this.textColors.length > 0 
+                    ? this.textColors[this.currentTextIndex % this.textColors.length] 
+                    : '';
+                this.contentSpan.textContent = this.displayedText;
+                if (color) {
+                    this.contentSpan.style.color = color;
+                }
+            }
+            
+            if (this.cursorSpan && this.hideCursorWhileTyping) {
+                const isTyping = this.currentCharIndex < this.text[this.currentTextIndex].length;
+                if (isTyping || this.isDeleting) {
+                    this.cursorSpan.classList.add('text-type__cursor--hidden');
+                } else {
+                    this.cursorSpan.classList.remove('text-type__cursor--hidden');
+                }
+            }
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize TextType animation
+        const textTypeElement = document.getElementById('text-type');
+        if (textTypeElement) {
+            new TextType(textTypeElement, {
+                text: ['Добро пожаловать в yo.route', 'Твой путь - yo.route', 'Developed by s1lph'],
+                typingSpeed: 75,
+                pauseDuration: 1500,
+                showCursor: true,
+                cursorCharacter: '|',
+                loop: true
+            });
+        }
+        
+        const loginForm = document.getElementById('login-form');
+        
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            // Преобразуем remember в boolean
+            data.remember = data.remember === 'on';
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Вход выполнен успешно', 'success');
+                    
+                    // Сохраняем токен если он есть
+                    if (result.token) {
+                        if (data.remember) {
+                            localStorage.setItem('auth_token', result.token);
+                        } else {
+                            sessionStorage.setItem('auth_token', result.token);
+                        }
+                    }
+                    
+                    // Редирект после успешного входа
+                    const redirect = this.dataset.redirect || '/orders';
+                    setTimeout(() => {
+                        window.location.href = redirect;
+                    }, 500);
+                } else {
+                    showNotification(result.message || 'Ошибка при входе. Проверьте почту и пароль.', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Ошибка соединения с сервером', 'error');
+            }
+        });
+    });
+</script>
+{% endblock %}
+
