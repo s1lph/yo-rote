@@ -58,6 +58,8 @@ function initPopups() {
 function initForms() {
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
+        if (form.hasAttribute('data-custom-submit')) return;
+        
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             handleFormSubmit(this);

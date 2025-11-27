@@ -3,24 +3,44 @@
 
 {% block title %}Планирование маршрута - yo.route{% endblock %}
 
+{% block extra_css %}
+<!-- Leaflet.js CSS for map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+    #map {
+        width: 100%;
+        height: 100%;
+        border-radius: 12px;
+    }
+
+    .map-container {
+        height: calc(100vh - 180px);
+        min-height: 500px;
+        position: relative;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="two-column show-map" id="optimization-container" style="max-width: 100%;">
     <div class="column">
         <h1 class="page-title" style="margin-bottom: 32px;">Планирование маршрута</h1>
-        
+
         <div class="date-input-group">
             <label class="date-label" for="day">День:</label>
             <input type="date" id="day" name="day" class="form-input" style="width: auto;">
         </div>
-        
+
         <div class="list-section">
             <div class="section-title">Заказы</div>
-            <button id="optimization-add-order" class="btn btn-secondary btn-small" style="margin-bottom: 16px;" type="button">+</button>
+            <button id="optimization-add-order" class="btn btn-secondary btn-small" style="margin-bottom: 16px;"
+                type="button">+</button>
             <div id="orders-list" class="orders-list">
                 <div class="list-item">Загрузка заказов...</div>
             </div>
         </div>
-        
+
         <div class="list-section">
             <div class="section-title">Маршруты</div>
             <div class="tabs">
@@ -31,52 +51,107 @@
             <button class="btn btn-primary" style="margin-top: 16px; width: 100%;">Отправить курьеру</button>
         </div>
     </div>
-    
+
     <div class="column">
         <div class="map-container">
-            <div>Карта с маршрутами</div>
+            <div id="map"></div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Leaflet.js Library -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-    document.addEventListener('DOMContentLoaded', async function() {
+    document.addEventListener('DOMContentLoaded', async function () {
         const dayInput = document.getElementById('day');
         const ordersList = document.getElementById('orders-list');
         const routesList = document.getElementById('routes-list');
         const addOrderShortcut = document.getElementById('optimization-add-order');
         const routeTabs = document.querySelectorAll('.tabs .tab');
+
         const state = {
             routes: {
                 active: [],
                 completed: []
             },
             selectedStatus: 'active',
-            focusOrderId: null
+            focusOrderId: null,
+            currentRouteId: null
         };
-        
+
+        // Инициализация карты Leaflet.js
+        const map = L.map('map').setView([55.7558, 37.6173], 11); // Москва по умолчанию
+
+        // Добавляем тайлы OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Слои для маршрутов и маркеров
+        let routeLayer = null;
+        let markersLayer = L.layerGroup().addTo(map);
+
+        // Функция декодирования polyline (Google Encoded Polyline)
+        function decodePolyline(encoded) {
+            const coords = [];
+            let index = 0;
+            let lat = 0;
+            let lng = 0;
+
+            while (index < encoded.length) {
+                // Декодируем latitude
+                let shift = 0;
+                let result = 0;
+                let b;
+                do {
+                    b = encoded.charCodeAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20);
+                const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+                lat += dlat;
+
+                // Декодируем longitude
+                shift = 0;
+                result = 0;
+                do {
+                    b = encoded.charCodeAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20);
+                const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+                lng += dlng;
+
+                coords.push([lat / 1e5, lng / 1e5]);
+            }
+
+            return coords;
+        }
+
         const hashValue = window.location.hash.replace('#', '');
         if (hashValue.startsWith('order=')) {
             const [, orderId] = hashValue.split('=');
             state.focusOrderId = orderId;
         }
-        
+
         // Устанавливаем сегодняшнюю дату
         const today = new Date();
         const isoDate = today.toISOString().split('T')[0];
         dayInput.value = isoDate;
-        
+
         dayInput.addEventListener('change', () => {
             loadOrders(dayInput.value);
             loadRoutes(state.selectedStatus, dayInput.value);
         });
-        
+
         addOrderShortcut.addEventListener('click', () => {
             window.location.href = '/orders#add-order';
         });
-        
+
         routeTabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 routeTabs.forEach(t => t.classList.remove('active'));
@@ -85,12 +160,12 @@
                 renderRoutes(tab.dataset.status);
             });
         });
-        
+
         await loadOrders(dayInput.value);
         await loadRoutes('active', dayInput.value);
         await loadRoutes('completed', dayInput.value);
         renderRoutes('active');
-        
+
         async function loadOrders(date) {
             ordersList.innerHTML = '<div class="list-item">Загрузка...</div>';
             try {
@@ -105,7 +180,7 @@
                 ordersList.innerHTML = '<div class="list-item">Не удалось загрузить заказы</div>';
             }
         }
-        
+
         async function loadRoutes(status, date) {
             routesList.innerHTML = '<div class="list-item">Загрузка маршрутов...</div>';
             try {
@@ -125,7 +200,7 @@
                 }
             }
         }
-        
+
         function renderOrders(orders) {
             if (!orders.length) {
                 ordersList.innerHTML = '<div class="list-item">Заказы отсутствуют</div>';
@@ -145,7 +220,7 @@
                 `;
             }).join('');
         }
-        
+
         function renderRoutes(status) {
             const routes = state.routes[status] || [];
             if (!routes.length) {
@@ -174,7 +249,7 @@
                     </div>
                 `;
             }).join('');
-            
+
             routesList.querySelectorAll('.route-edit-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const routeId = btn.dataset.routeId;
@@ -182,19 +257,118 @@
                 });
             });
         }
-        
+
         async function openRouteEdit(routeId) {
             showNotification('Загрузка маршрута...', 'info');
+            state.currentRouteId = routeId;
+
             try {
                 const response = await api.get(`/api/routes/${routeId}/optimize-view`);
                 console.log('Route optimization view:', response);
-                showNotification('Маршрут открыт для редактирования', 'success');
+
+                // Отображение маршрута на карте
+                displayRouteOnMap(response);
+
+                showNotification('Маршрут отображен на карте', 'success');
             } catch (error) {
                 console.error('Error loading optimization view:', error);
                 showNotification('Не удалось загрузить маршрут', 'error');
             }
         }
-        
+
+        function displayRouteOnMap(routeData) {
+            // Очистка предыдущих слоев
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+            }
+            markersLayer.clearLayers();
+
+            // Добавление маркера депо (стартовая точка курьера)
+            if (routeData.courier) {
+                const depotIcon = L.divIcon({
+                    className: 'custom-depot-marker',
+                    html: `<div style="
+                        background: #FF6B6B;
+                        color: white;
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 18px;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                    ">🏠</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+
+                L.marker([routeData.courier.start_lat, routeData.courier.start_lon], { icon: depotIcon })
+                    .bindPopup(`<b>Депо: ${routeData.courier.full_name}</b>`)
+                    .addTo(markersLayer);
+            }
+
+            // Добавление маркеров заказов
+            routeData.orders.forEach((order, index) => {
+                const orderNumber = index + 1;
+                const orderIcon = L.divIcon({
+                    className: 'custom-order-marker',
+                    html: `<div style="
+                        background: #4ECDC4;
+                        color: white;
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 14px;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                    ">${orderNumber}</div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+
+                L.marker([order.lat, order.lng], { icon: orderIcon })
+                    .bindPopup(`<b>${orderNumber}. ${order.order_name}</b><br>${order.address}`)
+                    .addTo(markersLayer);
+            });
+
+            // Отрисовка линии маршрута (polyline)
+            if (routeData.geometry || routeData.path) {
+                let pathCoords = [];
+
+                if (routeData.geometry) {
+                    // Декодируем encoded polyline
+                    pathCoords = decodePolyline(routeData.geometry);
+                } else if (routeData.path) {
+                    // Используем готовый path
+                    pathCoords = routeData.path.map(p => [p.lat, p.lng]);
+                }
+
+                if (pathCoords.length > 0) {
+                    routeLayer = L.polyline(pathCoords, {
+                        color: '#2196F3',
+                        weight: 4,
+                        opacity: 0.7,
+                        smoothFactor: 1
+                    }).addTo(map);
+
+                    // Центрируем карту по маршруту
+                    map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                }
+            } else if (routeData.orders.length > 0) {
+                // Если нет геометрии, центрируем по заказам
+                const orderCoords = routeData.orders.map(o => [o.lat, o.lng]);
+                const bounds = L.latLngBounds(orderCoords);
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
         function getSampleOrders(date) {
             return [
                 {
@@ -213,7 +387,7 @@
                 }
             ];
         }
-        
+
         function getSampleRoutes(status) {
             const samples = {
                 active: [
@@ -256,4 +430,3 @@
     });
 </script>
 {% endblock %}
-

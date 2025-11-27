@@ -24,33 +24,7 @@
                     </tr>
                 </thead>
                 <tbody id="couriers-table-body">
-                    <tr>
-                        <td><input type="radio" name="selected_courier" value="1"></td>
-                        <td>Азымбек Казбек</td>
-                        <td>Легковой автомобиль</td>
-                        <td>+79886761488</td>
-                        <td>@azibek2269</td>
-                        <td>********</td>
-                        <td>Москва ул. Пушкина 67</td>
-                    </tr>
-                    <tr>
-                        <td><input type="radio" name="selected_courier" value="2"></td>
-                        <td>Азамат Айталиев</td>
-                        <td>Грузовик</td>
-                        <td>+7977690013</td>
-                        <td>@azamat_official</td>
-                        <td>********</td>
-                        <td>Москва ул. Ленина 12</td>
-                    </tr>
-                    <tr>
-                        <td><input type="radio" name="selected_courier" value="3"></td>
-                        <td>Михаил Щербетов</td>
-                        <td>Скутер</td>
-                        <td>+79112345667</td>
-                        <td>@mishanya_pro0</td>
-                        <td>********</td>
-                        <td>Москва пр. Мира 45</td>
-                    </tr>
+                    <!-- Курьеры загружаются через JavaScript -->
                 </tbody>
             </table>
         </div>
@@ -71,7 +45,7 @@
                 style="color: var(--primary-blue); text-decoration: none;">t.me/example ↑</a>
         </div>
 
-        <form action="/api/couriers" method="POST" id="courier-form">
+        <form action="/api/couriers" method="POST" id="courier-form" data-custom-submit="true">
             <div class="form-group">
                 <label class="form-label" for="full_name">ФИО</label>
                 <input type="text" id="full_name" name="full_name" class="form-input" required>
@@ -147,13 +121,6 @@
 <script>
     // Загрузка курьеров
     document.addEventListener('DOMContentLoaded', async function () {
-        try {
-            const couriersData = await api.get('/api/couriers');
-            // TODO: Обновить таблицу курьеров
-        } catch (error) {
-            console.error('Error loading couriers:', error);
-        }
-
         // Элементы для работы с курьерами
         const addCourierBtn = document.getElementById('add-courier-btn');
         const addCourierColumn = document.getElementById('add-courier-column');
@@ -195,6 +162,38 @@
                     updateSelectedCourierPanel();
                 });
             });
+        }
+
+        // Рендеринг курьеров в таблицу
+        function renderCouriers(couriers) {
+            if (!couriers || couriers.length === 0) {
+                couriersTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px;">Курьеров пока нет</td></tr>';
+                return;
+            }
+
+            couriersTableBody.innerHTML = couriers.map(courier => `
+                <tr>
+                    <td><input type="radio" name="selected_courier" value="${courier.id}"></td>
+                    <td>${courier.full_name || ''}</td>
+                    <td>${vehicleTypeMap[courier.vehicle_type] || courier.vehicle_type || ''}</td>
+                    <td>${courier.phone || ''}</td>
+                    <td>${courier.telegram || ''}</td>
+                    <td>********</td>
+                    <td>${courier.current_order || '-'}</td>
+                </tr>
+            `).join('');
+
+            updateRadioButtons();
+            updateSelectedCourierPanel();
+        }
+
+        // Загрузка курьеров из API
+        try {
+            const couriersData = await api.get('/api/couriers');
+            renderCouriers(couriersData.couriers || []);
+        } catch (error) {
+            console.error('Error loading couriers:', error);
+            renderCouriers([]);
         }
 
         // Инициализация обработчиков
@@ -320,6 +319,11 @@
         // Обработка формы добавления/редактирования курьера
         courierForm.addEventListener('submit', async function (e) {
             e.preventDefault();
+
+            // Предотвращаем двойную отправку
+            if (this.dataset.submitting === 'true') return;
+            this.dataset.submitting = 'true';
+
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
             const editId = this.dataset.editId;
@@ -341,14 +345,18 @@
                 if (result.success) {
                     showNotification(editId ? 'Курьер успешно изменен' : 'Курьер успешно добавлен', 'success');
                     closeAddCourierForm();
-                    // TODO: Обновить таблицу курьеров
-                    updateRadioButtons();
+
+                    // Перезагружаем список курьеров
+                    const couriersData = await api.get('/api/couriers');
+                    renderCouriers(couriersData.couriers || []);
                 } else {
                     showNotification(result.message || 'Ошибка при сохранении', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
                 showNotification('Ошибка соединения с сервером', 'error');
+            } finally {
+                this.dataset.submitting = 'false';
             }
         });
     });

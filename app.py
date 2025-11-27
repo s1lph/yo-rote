@@ -92,11 +92,45 @@ yo.route - API Endpoints для Backend интеграции
 - DELETE - удаление записи
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session
 from flask_cors import CORS
+from dotenv import load_dotenv
+import os
+from functools import wraps
+
+# Загрузка переменных окружения из .env файла
+load_dotenv()
+
+# Импорт моделей и оптимизатора
+from models import db, User, Courier, Order, Route, Point
+import optimizer
 
 app = Flask(__name__)
 CORS(app)
+
+# Конфигурация базы данных
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///logistics.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SESSION_TYPE'] = 'filesystem'
+
+# Инициализация БД
+db.init_app(app)
+
+# Создание таблиц при первом запуске
+with app.app_context():
+    db.create_all()
+    print("✅ База данных инициализирована")
+
+
+# Декоратор для проверки аутентификации
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Главная страница - редирект на вход или дашборд
 @app.route('/')
@@ -143,104 +177,256 @@ def settings():
 def account():
     return render_template('account.html')
 
-# API endpoints для backend интеграции
+# ============================================
+# AUTHENTICATION API - Регистрация и вход
+# ============================================
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    """
+    POST /api/register - Регистрация новой компании
+    
+    Тело запроса:
+    {
+        "company_name": "string",
+        "activity": "string",
+        "email": "string",
+        "phone": "string",
+        "password": "string",
+        "terms": boolean
+    }
+    """
+    data = request.json or {}
+    
+    # Валидация
+    if not data.get('email'):
+        return jsonify({'success': False, 'message': 'Email обязателен'}), 400
+    if not data.get('password'):
+        return jsonify({'success': False, 'message': 'Пароль обязателен'}), 400
+    if not data.get('company_name'):
+        return jsonify({'success': False, 'message': 'Название компании обязательно'}), 400
+    if not data.get('terms'):
+        return jsonify({'success': False, 'message': 'Необходимо принять условия использования'}), 400
+    
+    # Проверка существования пользователя
+    existing_user = User.query.filter_by(email=data['email']).first()
+    if existing_user:
+        return jsonify({'success': False, 'message': 'Пользователь с такой почтой уже существует'}), 400
+    
+    # Создание нового пользователя
+    user = User(
+        email=data['email'],
+        company_name=data['company_name'],
+        activity=data.get('activity', ''),
+        phone=data.get('phone', '')
+    )
+    user.set_password(data['password'])
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    # Автоматический вход после регистрации
+    session['user_id'] = user.id
+    session['user_email'] = user.email
+    
+    return jsonify({
+        'success': True,
+        'message': 'Регистрация успешна',
+        'user': user.to_dict()
+    })
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    data = request.json
-    # TODO: Интеграция с backend
-    # Пример структуры данных:
-    # {
-    #     "email": "string",
-    #     "password": "string",
-    #     "remember": boolean
-    # }
-    # 
-    # Backend должен вернуть:
-    # {
-    #     "success": true,
-    #     "message": "Вход выполнен успешно",
-    #     "token": "JWT токен или сессионный токен",
-    #     "user": {
-    #         "id": number,
-    #         "email": "string",
-    #         "company_name": "string"
-    #     }
-    # }
-    # 
-    # При ошибке:
-    # {
-    #     "success": false,
-    #     "message": "Неверная почта или пароль"
-    # }
+    """
+    POST /api/login - Вход в систему
     
-    # Пример проверки (заменить на реальную проверку в backend)
+    Тело запроса:
+    {
+        "email": "string",
+        "password": "string",
+        "remember": boolean
+    }
+    """
+    data = request.json or {}
+    
     email = data.get('email', '')
     password = data.get('password', '')
     
     if not email or not password:
         return jsonify({'success': False, 'message': 'Пожалуйста, заполните все поля'}), 400
     
-    # TODO: Проверка email и password в базе данных через backend
-    # TODO: Генерация JWT токена или сессии
-    # TODO: Возврат данных пользователя
+    # Поиск пользователя
+    user = User.query.filter_by(email=email).first()
+    
+    # Проверка пароля
+    if not user or not user.check_password(password):
+        return jsonify({'success': False, 'message': 'Неверный email или пароль'}), 401
+    
+    # Создание сессии
+    session['user_id'] = user.id
+    session['user_email'] = user.email
+    
+    if data.get('remember'):
+        session.permanent = True
     
     return jsonify({
         'success': True,
         'message': 'Вход выполнен успешно',
-        'token': 'example_token_here',  # Заменить на реальный токен из backend
-        'user': {
-            'id': 1,
-            'email': email,
-            'company_name': 'Example Company'
-        }
+        'user': user.to_dict()
     })
 
-@app.route('/api/register', methods=['POST'])
-def api_register():
-    data = request.json
-    # TODO: Интеграция с backend
-    # Пример структуры данных:
-    # {
-    #     "company_name": "string",
-    #     "activity": "string",
-    #     "email": "string",
-    #     "phone": "string",
-    #     "terms": boolean
-    # }
-    #
-    # Backend должен вернуть:
-    # {
-    #     "success": true,
-    #     "message": "Компания создана",
-    #     "token": "JWT токен или сессионный токен",
-    #     "user": {
-    #         "id": number,
-    #         "email": "string",
-    #         "company_name": "string"
-    #     }
-    # }
-    #
-    # При ошибке:
-    # {
-    #     "success": false,
-    #     "message": "Компания с такой почтой уже существует"
-    # }
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    """
+    POST /api/logout - Выход из системы
+    """
+    session.clear()
+    return jsonify({'success': True, 'message': 'Выход выполнен'})
+
+@app.route('/api/user/current', methods=['GET'])
+def api_current_user():
+    """
+    GET /api/user/current - Получение данных текущего пользователя
+    """
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Не авторизован'}), 401
     
-    # TODO: Проверка существования email в базе данных
-    # TODO: Создание новой компании в базе данных
-    # TODO: Генерация JWT токена или сессии
-    # TODO: Возврат данных пользователя
+    user = User.query.get(session['user_id'])
+    if not user:
+        session.clear()
+        return jsonify({'success': False, 'message': 'Пользователь не найден'}), 404
     
     return jsonify({
         'success': True,
-        'message': 'Компания создана',
-        'token': 'example_token_here',  # Заменить на реальный токен из backend
-        'user': {
-            'id': 1,
-            'email': data.get('email', ''),
-            'company_name': data.get('company_name', '')
-        }
-    })
+        'user': user.to_dict()
+     })
+
+# ============================================
+# GEOCODING & ROUTING API - Автокомплит и предпросмотр маршрутов
+# ============================================
+
+@app.route('/api/geocode/search', methods=['GET'])
+def api_geocode_search():
+    """
+    GET /api/geocode/search - Поиск адресов для автокомплита
+    
+    Query параметры:
+    - q: поисковый запрос (строка адреса)
+    - limit: максимальное количество результатов (default: 8)
+    
+    Возвращает:
+    {
+        "suggestions": [
+            {
+                "label": "Красная площадь, Москва",
+                "lat": 55.7558,
+                "lon": 37.6173
+            }
+        ]
+    }
+    """
+    query = request.args.get('q', '')
+    limit = request.args.get('limit', 8, type=int)
+    
+    if not query or len(query) < 3:
+        return jsonify({'suggestions': []})
+    
+    try:
+        # Вызов OpenRouteService Pelias Search API
+        import openrouteservice
+        client = openrouteservice.Client(key=os.getenv('ORS_API_KEY', ''))
+        
+        results = client.pelias_search(text=query, country='RU', size=limit)
+        
+        suggestions = []
+        if results and 'features' in results:
+            for feature in results['features']:
+                coords = feature['geometry']['coordinates']
+                label = feature['properties'].get('label', query)
+                
+                suggestions.append({
+                    'label': label,
+                    'lon': coords[0],
+                    'lat': coords[1]
+                })
+        
+        return jsonify({'suggestions': suggestions})
+    
+    except Exception as e:
+        print(f"Ошибка геокодинга: {e}")
+        return jsonify({'suggestions': [], 'error': str(e)}), 500
+
+@app.route('/api/routes/preview', methods=['POST'])
+def api_route_preview():
+    """
+    POST /api/routes/preview - Предпросмотр маршрута между двумя точками
+    
+    Тело запроса:
+    {
+        "origin_lat": number,
+        "origin_lon": number,
+        "destination_lat": number,
+        "destination_lon": number,
+        "profile": "driving-car" (optional)
+    }
+    
+    Возвращает:
+    {
+        "geometry": "encoded polyline",
+        "distance": number (метры),
+        "duration": number (секунды)
+    }
+    """
+    data = request.json or {}
+    
+    # Валидация
+    required_fields = ['origin_lat', 'origin_lon', 'destination_lat', 'destination_lon']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'message': f'Поле {field} обязательно'}), 400
+    
+    try:
+        import openrouteservice
+        client = openrouteservice.Client(key=os.getenv('ORS_API_KEY', ''))
+        
+        # Координаты в формате [lon, lat]
+        coords = [
+            [data['origin_lon'], data['origin_lat']],
+            [data['destination_lon'], data['destination_lat']]
+        ]
+        
+        profile = data.get('profile', 'driving-car')
+        
+        # Запрос маршрута через OpenRouteService Directions API
+        route = client.directions(
+            coordinates=coords,
+            profile=profile,
+            format='geojson',
+            geometry=True
+        )
+        
+        if route and 'features' in route and route['features']:
+            feature = route['features'][0]
+            geometry = feature['geometry']['coordinates']
+            properties = feature['properties']
+            summary = properties.get('summary', {})
+            
+            # Конвертируем координаты в encoded polyline
+            # Для упрощения возвращаем просто массив координат
+            path = [[coord[1], coord[0]] for coord in geometry]  # [lat, lon]
+            
+            return jsonify({
+                'success': True,
+                'path': path,
+                'distance': summary.get('distance', 0),  # метры
+                'duration': summary.get('duration', 0)   # секунды
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Не удалось построить маршрут'}), 500
+    
+    except Exception as e:
+        print(f"Ошибка построения маршрута: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ============================================
 # ORDERS API - Работа с заказами
@@ -289,14 +475,37 @@ def api_orders():
     order_name является обязательным полем и используется как основной идентификатор заказа во всех интерфейсах.
     """
     if request.method == 'GET':
-        # TODO: Получение списка заказов из БД
-        # TODO: Применить фильтры из query параметров
-        # TODO: Пагинация
+        # Получение параметров запроса
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 50, type=int)
+        status = request.args.get('status', None)
+        visit_date = request.args.get('visit_date', None)
+        search = request.args.get('search', None)
+        
+        # Базовый запрос
+        query = Order.query
+        
+        # Применение фильтров
+        if status:
+            query = query.filter_by(status=status)
+        if visit_date:
+            query = query.filter_by(visit_date=visit_date)
+        if search:
+            query = query.filter(
+                (Order.order_name.like(f'%{search}%')) |
+                (Order.address.like(f'%{search}%')) |
+                (Order.recipient_name.like(f'%{search}%'))
+            )
+        
+        # Пагинация
+        total = query.count()
+        orders = query.offset((page - 1) * limit).limit(limit).all()
+        
         return jsonify({
-            'orders': [],
-            'total': 0,
-            'page': 1,
-            'limit': 50
+            'orders': [order.to_dict() for order in orders],
+            'total': total,
+            'page': page,
+            'limit': limit
         })
     else:
         """
@@ -323,13 +532,49 @@ def api_orders():
             "message": "Заказ создан"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Создание заказа в БД
-        # TODO: Возврат ID созданного заказа
         data = request.json or {}
+        
+        # Валидация обязательных полей
         if not data.get('order_name'):
             return jsonify({'success': False, 'message': 'Название заказа обязательно'}), 400
-        return jsonify({'success': True, 'id': 1, 'message': 'Заказ создан'})
+        
+        address = data.get('destination_point') or data.get('address')
+        if not address:
+            return jsonify({'success': False, 'message': 'Адрес обязателен'}), 400
+        
+        # Создание заказа
+        order = Order(
+            order_name=data.get('order_name'),
+            destination_point=data.get('destination_point', ''),
+            address=address,
+            visit_date=data.get('visit_date'),
+            visit_time=data.get('visit_time'),
+            time_at_point=data.get('time_at_point', 15),
+            recipient_name=data.get('recipient_name'),
+            recipient_phone=data.get('recipient_phone'),
+            comment=data.get('comment'),
+            company=data.get('company'),
+            status='planned'
+        )
+        
+        # Геокодирование адреса
+        coords = optimizer.geocode_address(address)
+        if coords:
+            order.lon, order.lat = coords[0], coords[1]
+        else:
+            # Если геокодирование не удалось, все равно создаем заказ
+            print(f"⚠️  Заказ создан без координат: {address}")
+        
+        db.session.add(order)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'id': order.id,
+            'message': 'Заказ создан',
+            'lat': order.lat,
+            'lon': order.lon
+        })
 
 @app.route('/api/orders/<int:order_id>', methods=['GET', 'DELETE', 'PUT'])
 def api_order(order_id):
@@ -355,15 +600,10 @@ def api_order(order_id):
     }
     """
     if request.method == 'GET':
-        # TODO: Получение заказа из БД по ID
-        # TODO: Проверка существования заказа
-        return jsonify({
-            'id': order_id,
-            'order_name': f'Заказ #{order_id}',
-            'status': 'planned',
-            'courier_id': None,
-            'courier_name': None
-        })
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
+        return jsonify(order.to_dict())
     elif request.method == 'DELETE':
         """
         DELETE /api/orders/<id> - Удаление заказа
@@ -374,8 +614,12 @@ def api_order(order_id):
             "message": "Заказ удален"
         }
         """
-        # TODO: Проверка существования заказа
-        # TODO: Удаление заказа из БД
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
+        
+        db.session.delete(order)
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Заказ удален'})
     else:
         """
@@ -402,9 +646,33 @@ def api_order(order_id):
             "message": "Заказ обновлен"
         }
         """
-        # TODO: Проверка существования заказа
-        # TODO: Обновление заказа в БД
+        order = Order.query.get(order_id)
+        if not order:
+            return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
+        
         data = request.json
+        
+        # Обновление полей
+        if 'order_name' in data:
+            order.order_name = data['order_name']
+        if 'address' in data or 'destination_point' in data:
+            new_address = data.get('address') or data.get('destination_point')
+            order.address = new_address
+            order.destination_point = data.get('destination_point', '')
+            # Перегеокодируем адрес
+            coords = optimizer.geocode_address(new_address)
+            if coords:
+                order.lon, order.lat = coords[0], coords[1]
+        if 'visit_date' in data:
+            order.visit_date = data['visit_date']
+        if 'visit_time' in data:
+            order.visit_time = data['visit_time']
+        if 'status' in data:
+            order.status = data['status']
+        if 'comment' in data:
+            order.comment = data['comment']
+        
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Заказ обновлен'})
 
 @app.route('/api/orders/batch', methods=['DELETE', 'PUT'])
@@ -425,14 +693,18 @@ def api_orders_batch():
     }
     """
     if request.method == 'DELETE':
-        # TODO: Валидация массива ID
-        # TODO: Массовое удаление заказов из БД
-        # TODO: Возврат количества удаленных записей
         data = request.json
         ids = data.get('ids', [])
+        
+        if not ids:
+            return jsonify({'success': False, 'message': 'Не указаны ID заказов'}), 400
+        
+        deleted_count = Order.query.filter(Order.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+        
         return jsonify({
             'success': True,
-            'deleted_count': len(ids),
+            'deleted_count': deleted_count,
             'message': 'Заказы удалены'
         })
     else:
@@ -594,9 +866,27 @@ def api_routes():
     }
     """
     if request.method == 'GET':
-        # TODO: Получение маршрутов из БД
-        # TODO: Применить фильтры
-        return jsonify({'routes': []})
+        # Получение параметров фильтрации
+        date = request.args.get('date', None)
+        courier_id = request.args.get('courier_id', None, type=int)
+        status = request.args.get('status', None)
+        
+        # Базовый запрос
+        query = Route.query
+        
+        # Применение фильтров
+        if date:
+            query = query.filter_by(date=date)
+        if courier_id:
+            query = query.filter_by(courier_id=courier_id)
+        if status:
+            query = query.filter_by(status=status)
+        
+        routes = query.all()
+        
+        return jsonify({
+            'routes': [route.to_dict() for route in routes]
+        })
     else:
         """
         POST /api/routes - Создание нового маршрута
@@ -616,10 +906,34 @@ def api_routes():
             "message": "Маршрут создан"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Создание маршрута в БД
         data = request.json
-        return jsonify({'success': True, 'id': 1, 'message': 'Маршрут создан'})
+        
+        if not data.get('courier_id') or not data.get('date'):
+            return jsonify({'success': False, 'message': 'Не указан курьер или дата'}), 400
+        
+        courier = Courier.query.get(data['courier_id'])
+        if not courier:
+            return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+        
+        # Создание маршрута
+        route = Route(
+            courier_id=data['courier_id'],
+            date=data['date'],
+            status=data.get('status', 'active')
+        )
+        
+        db.session.add(route)
+        db.session.commit()
+        
+        # Привязка заказов если указаны
+        if 'orders' in data and data['orders']:
+            for order_id in data['orders']:
+                order = Order.query.get(order_id)
+                if order:
+                    order.route_id = route.id
+            db.session.commit()
+        
+        return jsonify({'success': True, 'id': route.id, 'message': 'Маршрут создан'})
 
 @app.route('/api/routes/<int:route_id>', methods=['GET', 'PUT', 'DELETE'])
 def api_route(route_id):
@@ -639,8 +953,10 @@ def api_route(route_id):
     }
     """
     if request.method == 'GET':
-        # TODO: Получение маршрута из БД по ID
-        return jsonify({'id': route_id, 'status': 'active'})
+        route = Route.query.get(route_id)
+        if not route:
+            return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
+        return jsonify(route.to_dict())
     elif request.method == 'PUT':
         """
         PUT /api/routes/<id> - Обновление маршрута
@@ -658,8 +974,18 @@ def api_route(route_id):
             "message": "Маршрут обновлен"
         }
         """
-        # TODO: Обновление маршрута в БД
+        route = Route.query.get(route_id)
+        if not route:
+            return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
+        
         data = request.json
+        
+        if 'status' in data:
+            route.status = data['status']
+        if 'courier_id' in data:
+            route.courier_id = data['courier_id']
+        
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Маршрут обновлен'})
     else:
         """
@@ -671,7 +997,16 @@ def api_route(route_id):
             "message": "Маршрут удален"
         }
         """
-        # TODO: Удаление маршрута из БД
+        route = Route.query.get(route_id)
+        if not route:
+            return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
+        
+        # Открепляем заказы от маршрута
+        for order in route.orders:
+            order.route_id = None
+        
+        db.session.delete(route)
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Маршрут удален'})
 
 @app.route('/api/routes/optimize', methods=['POST'])
@@ -697,14 +1032,70 @@ def api_routes_optimize():
     }
     """
     data = request.json
-    # TODO: Запуск внешнего скрипта/сервиса оптимизации
-    # TODO: Сохранение задачи оптимизации и возврат ID
+    
+    # Валидация входных данных
+    if not data.get('date'):
+        return jsonify({'success': False, 'message': 'Не указана дата'}), 400
+    
+    date = data['date']
+    courier_id = data.get('courier_id')
+    
+    # Если курьер не указан, берем первого доступного
+    if not courier_id:
+        courier = Courier.query.first()
+        if not courier:
+            return jsonify({'success': False, 'message': 'Нет доступных курьеров'}), 400
+        courier_id = courier.id
+    else:
+        courier = Courier.query.get(courier_id)
+        if not courier:
+            return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+    
+    # Выборка нераспределенных заказов на дату
+    orders = Order.query.filter_by(
+        visit_date=date,
+        route_id=None,
+        status='planned'
+    ).all()
+    
+    if not orders:
+        return jsonify({
+            'success': False,
+            'message': 'Нет нераспределенных заказов на указанную дату'
+        }), 400
+    
+    # Вызов оптимизатора
+    geometry, sorted_orders = optimizer.build_route(orders, courier)
+    
+    if not geometry or not sorted_orders:
+        return jsonify({
+            'success': False,
+            'message': 'Не удалось построить маршрут. Проверьте настройки ORS API.'
+        }), 500
+    
+    # Создание маршрута в БД
+    route = Route(
+        courier_id=courier.id,
+        date=date,
+        status='active',
+        geometry=geometry
+    )
+    
+    db.session.add(route)
+    db.session.commit()
+    
+    # Привязка заказов к маршруту в оптимальном порядке
+    for order in sorted_orders:
+        order.route_id = route.id
+    
+    db.session.commit()
+    
     return jsonify({
         'success': True,
-        'message': 'Оптимизация запущена',
-        'task_id': 'opt-task-123',
-        'estimated_time': '30s',
-        'preview_route_id': 1
+        'message': 'Маршрут оптимизирован',
+        'route_id': route.id,
+        'orders_count': len(sorted_orders),
+        'preview_route_id': route.id
     })
 
 @app.route('/api/routes/<int:route_id>/edit', methods=['POST'])
@@ -759,15 +1150,43 @@ def api_route_optimize_view(route_id):
         ]
     }
     """
-    # TODO: Получение координат маршрута и заказов, подготовка данных для карты
+    route = Route.query.get(route_id)
+    if not route:
+        return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
+    
+    # Подготовка данных для визуализации
+    orders_data = []
+    for order in route.orders:
+        if order.lat and order.lon:
+            orders_data.append({
+                'order_id': order.id,
+                'order_name': order.order_name,
+                'address': order.address,
+                'lat': order.lat,
+                'lng': order.lon,
+                'status': order.status
+            })
+    
+    # Декодирование геометрии маршрута в координаты
+    path = []
+    if route.geometry:
+        try:
+            decoded = optimizer.decode_polyline(route.geometry)
+            path = [{'lat': coord[0], 'lng': coord[1]} for coord in decoded]
+        except Exception as e:
+            print(f"Ошибка декодирования polyline: {e}")
+    
     return jsonify({
-        'route_id': route_id,
+        'route_id': route.id,
         'courier': {
-            'id': 1,
-            'full_name': 'Азымбек Казбек'
+            'id': route.courier.id,
+            'full_name': route.courier.full_name,
+            'start_lat': route.courier.start_lat,
+            'start_lon': route.courier.start_lon
         },
-        'orders': [],
-        'path': []
+        'orders': orders_data,
+        'path': path,
+        'geometry': route.geometry  # также отдаем encoded для фронтенда
     })
 
 # ============================================
@@ -801,8 +1220,10 @@ def api_couriers():
     }
     """
     if request.method == 'GET':
-        # TODO: Получение списка курьеров из БД
-        return jsonify({'couriers': []})
+        couriers = Courier.query.all()
+        return jsonify({
+            'couriers': [courier.to_dict() for courier in couriers]
+        })
     else:
         """
         POST /api/couriers - Добавление курьера
@@ -829,11 +1250,31 @@ def api_couriers():
             "message": "Курьер с таким телефоном уже существует"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Проверка уникальности телефона/telegram
-        # TODO: Создание курьера в БД
         data = request.json
-        return jsonify({'success': True, 'id': 1, 'message': 'Курьер добавлен'})
+        
+        if not data.get('full_name'):
+            return jsonify({'success': False, 'message': 'Имя курьера обязательно'}), 400
+        
+        # Проверка уникальности телефона
+        if data.get('phone'):
+            existing = Courier.query.filter_by(phone=data['phone']).first()
+            if existing:
+                return jsonify({'success': False, 'message': 'Курьер с таким телефоном уже существует'}), 400
+        
+        courier = Courier(
+            full_name=data['full_name'],
+            phone=data.get('phone'),
+            telegram=data.get('telegram'),
+            profile=data.get('profile', 'driving-car'),
+            capacity=data.get('capacity', 100),
+            start_lat=data.get('start_lat', 55.7558),
+            start_lon=data.get('start_lon', 37.6173)
+        )
+        
+        db.session.add(courier)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'id': courier.id, 'message': 'Курьер добавлен'})
 
 @app.route('/api/couriers/<int:courier_id>', methods=['GET', 'PUT', 'DELETE'])
 def api_courier(courier_id):
@@ -853,8 +1294,10 @@ def api_courier(courier_id):
     }
     """
     if request.method == 'GET':
-        # TODO: Получение курьера из БД по ID
-        return jsonify({'id': courier_id, 'full_name': ''})
+        courier = Courier.query.get(courier_id)
+        if not courier:
+            return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+        return jsonify(courier.to_dict())
     elif request.method == 'PUT':
         """
         PUT /api/couriers/<id> - Обновление курьера
@@ -874,9 +1317,28 @@ def api_courier(courier_id):
             "message": "Курьер обновлен"
         }
         """
-        # TODO: Проверка существования курьера
-        # TODO: Обновление курьера в БД
+        courier = Courier.query.get(courier_id)
+        if not courier:
+            return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+        
         data = request.json
+        
+        if 'full_name' in data:
+            courier.full_name = data['full_name']
+        if 'phone' in data:
+            courier.phone = data['phone']
+        if 'telegram' in data:
+            courier.telegram = data['telegram']
+        if 'profile' in data:
+            courier.profile = data['profile']
+        if 'capacity' in data:
+            courier.capacity = data['capacity']
+        if 'start_lat' in data:
+            courier.start_lat = data['start_lat']
+        if 'start_lon' in data:
+            courier.start_lon = data['start_lon']
+        
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Курьер обновлен'})
     else:
         """
@@ -888,9 +1350,20 @@ def api_courier(courier_id):
             "message": "Курьер удален"
         }
         """
-        # TODO: Проверка существования курьера
-        # TODO: Проверка связанных маршрутов (можно ли удалить)
-        # TODO: Удаление курьера из БД
+        courier = Courier.query.get(courier_id)
+        if not courier:
+            return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+        
+        # Проверка активных маршрутов
+        active_routes = Route.query.filter_by(courier_id=courier_id, status='active').count()
+        if active_routes > 0:
+            return jsonify({
+                'success': False,
+                'message': f'Нельзя удалить курьера с активными маршрутами ({active_routes})'
+            }), 400
+        
+        db.session.delete(courier)
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Курьер удален'})
 
 # ============================================
@@ -918,8 +1391,8 @@ def api_points():
     }
     """
     if request.method == 'GET':
-        # TODO: Получение списка точек из БД
-        return jsonify({'points': []})
+        points = Point.query.all()
+        return jsonify({'points': [point.to_dict() for point in points]})
     else:
         """
         POST /api/points - Добавление точки отправки
@@ -945,14 +1418,27 @@ def api_points():
             "message": "Точка с таким адресом уже существует"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Если make_primary=true, снять primary с других точек
-        # TODO: Создание точки в БД
         data = request.json
         address = data.get('address')
         if not address:
             return jsonify({'success': False, 'message': 'Адрес обязателен'}), 400
-        return jsonify({'success': True, 'id': 1, 'message': 'Точка добавлена'})
+            
+        # Если make_primary=true, снимаем флаг с других точек
+        make_primary = data.get('make_primary', False)
+        if make_primary:
+            Point.query.update({Point.is_primary: False})
+            
+        point = Point(
+            address=address,
+            is_primary=make_primary,
+            latitude=data.get('latitude') or data.get('lat'),
+            longitude=data.get('longitude') or data.get('lon')
+        )
+        
+        db.session.add(point)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'id': point.id, 'message': 'Точка добавлена'})
 
 @app.route('/api/points/<int:point_id>', methods=['GET', 'PUT', 'DELETE'])
 def api_point(point_id):
@@ -971,8 +1457,10 @@ def api_point(point_id):
     }
     """
     if request.method == 'GET':
-        # TODO: Получение точки из БД по ID
-        return jsonify({'id': point_id, 'address': ''})
+        point = Point.query.get(point_id)
+        if not point:
+            return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
+        return jsonify(point.to_dict())
     elif request.method == 'PUT':
         """
         PUT /api/points/<id> - Обновление точки отправки
@@ -991,10 +1479,28 @@ def api_point(point_id):
             "message": "Точка обновлена"
         }
         """
-        # TODO: Проверка существования точки
-        # TODO: Если make_primary=true, снять primary с других точек
-        # TODO: Обновление точки в БД
+        point = Point.query.get(point_id)
+        if not point:
+            return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
+            
         data = request.json
+        
+        if 'address' in data:
+            point.address = data['address']
+            
+        if 'make_primary' in data:
+            make_primary = data['make_primary']
+            point.is_primary = make_primary
+            if make_primary:
+                # Снимаем флаг с других точек
+                Point.query.filter(Point.id != point_id).update({Point.is_primary: False})
+                
+        if 'latitude' in data:
+            point.latitude = data['latitude']
+        if 'longitude' in data:
+            point.longitude = data['longitude']
+            
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Точка обновлена'})
     else:
         """
@@ -1012,10 +1518,18 @@ def api_point(point_id):
             "message": "Нельзя удалить основную точку" или "Точка используется в заказах"
         }
         """
-        # TODO: Проверка существования точки
-        # TODO: Проверка, не является ли точка основной
-        # TODO: Проверка связанных заказов
-        # TODO: Удаление точки из БД
+        point = Point.query.get(point_id)
+        if not point:
+            return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
+            
+        if point.is_primary:
+             # Проверяем, есть ли другие точки
+            other_points_count = Point.query.filter(Point.id != point_id).count()
+            if other_points_count > 0:
+                 return jsonify({'success': False, 'message': 'Нельзя удалить основную точку, назначьте другую точку основной'}), 400
+        
+        db.session.delete(point)
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Точка удалена'})
 
 # ============================================
@@ -1194,24 +1708,5 @@ def api_user():
         # TODO: Обновление данных пользователя в БД
         data = request.json
         return jsonify({'success': True, 'message': 'Данные обновлены'})
-
-@app.route('/api/logout', methods=['POST'])
-def api_logout():
-    """
-    POST /api/logout - Выход из системы
-    
-    Требует аутентификации (токен в заголовке Authorization)
-    
-    Возвращает:
-    {
-        "success": true,
-        "message": "Выход выполнен"
-    }
-    """
-    # TODO: Проверка токена аутентификации
-    # TODO: Инвалидация токена/сессии в БД
-    return jsonify({'success': True, 'message': 'Выход выполнен'})
-
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
