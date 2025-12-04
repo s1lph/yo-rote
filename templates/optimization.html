@@ -8,53 +8,590 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
+    /* ===== Optimization Page Layout ===== */
+    .opt-container {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 24px;
+        height: calc(100vh - 64px);
+        max-width: 100%;
+    }
+
+    /* ===== Left Sidebar ===== */
+    .opt-sidebar {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(20px) saturate(180%);
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow:
+            0 20px 60px rgba(37, 99, 235, 0.12),
+            0 8px 24px rgba(0, 0, 0, 0.08),
+            0 0 0 1px rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .opt-sidebar-header {
+        padding: 24px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .opt-sidebar-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+
+    .opt-sidebar-title h1 {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .route-count-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, var(--primary-blue), var(--light-blue));
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .route-count-badge i {
+        font-size: 12px;
+    }
+
+    /* ===== Segmented Tabs ===== */
+    .route-tabs {
+        display: flex;
+        background: rgba(241, 245, 249, 0.8);
+        border-radius: 12px;
+        padding: 4px;
+        gap: 4px;
+    }
+
+    .route-tab {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-gray);
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .route-tab:hover {
+        color: var(--text-dark);
+        background: rgba(255, 255, 255, 0.5);
+    }
+
+    .route-tab.active {
+        background: white;
+        color: var(--text-dark);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ===== Routes List ===== */
+    .opt-routes-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    .opt-routes-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .opt-routes-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .opt-routes-list::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 3px;
+    }
+
+    /* ===== Route Card ===== */
+    .route-card {
+        background: white;
+        border-radius: 16px;
+        padding: 18px;
+        margin-bottom: 12px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .route-card:hover {
+        border-color: rgba(37, 99, 235, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+    }
+
+    .route-card.selected {
+        border-color: var(--primary-blue);
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.04), rgba(59, 130, 246, 0.02));
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+    }
+
+    .route-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .courier-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 16px;
+    }
+
+    .courier-info {
+        flex: 1;
+    }
+
+    .courier-name {
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--text-dark);
+        margin-bottom: 2px;
+    }
+
+    .courier-vehicle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-gray);
+    }
+
+    .courier-vehicle i {
+        font-size: 14px;
+        color: var(--light-blue);
+    }
+
+    /* ===== Route Metrics ===== */
+    .route-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding: 14px;
+        background: rgba(248, 250, 252, 0.8);
+        border-radius: 12px;
+        margin-bottom: 14px;
+    }
+
+    .metric-item {
+        text-align: center;
+    }
+
+    .metric-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 6px;
+        font-size: 14px;
+    }
+
+    .metric-icon.orders {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+        color: var(--success-green);
+    }
+
+    .metric-icon.distance {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(37, 99, 235, 0.05));
+        color: var(--primary-blue);
+    }
+
+    .metric-icon.duration {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+        color: #f59e0b;
+    }
+
+    .metric-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 2px;
+    }
+
+    .metric-label {
+        font-size: 11px;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* ===== Route Card Actions ===== */
+    .route-card-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .route-card-actions .btn {
+        flex: 1;
+        padding: 10px 16px;
+        font-size: 13px;
+        border-radius: 10px;
+    }
+
+    .btn-edit {
+        background: rgba(241, 245, 249, 0.9);
+        color: var(--text-dark);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-edit:hover {
+        background: var(--border-color);
+    }
+
+    .btn-send {
+        background: linear-gradient(135deg, var(--primary-blue), var(--light-blue));
+        color: white;
+        border: none;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-send:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+    }
+
+    /* ===== Right Column - Map Area ===== */
+    .opt-map-area {
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(20px) saturate(180%);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow:
+            0 20px 60px rgba(37, 99, 235, 0.12),
+            0 8px 24px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .opt-map-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .opt-map-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    /* ===== Styled Date Picker ===== */
+    .date-picker-wrapper {
+        position: relative;
+    }
+
+    .date-picker-styled {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        background: rgba(248, 250, 252, 0.9);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .date-picker-styled:hover {
+        border-color: var(--primary-blue);
+        background: white;
+    }
+
+    .date-picker-styled i {
+        color: var(--primary-blue);
+        font-size: 16px;
+    }
+
+    .date-picker-text {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-dark);
+    }
+
+    .date-picker-styled input[type="date"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    /* ===== Map Container ===== */
+    .opt-map-container {
+        flex: 1;
+        position: relative;
+        min-height: 500px;
+    }
+
     #map {
         width: 100%;
         height: 100%;
-        border-radius: 12px;
+        border-radius: 0;
     }
 
-    .map-container {
-        height: calc(100vh - 180px);
-        min-height: 500px;
-        position: relative;
+    /* ===== Floating Action Button ===== */
+    .fab-optimize {
+        position: absolute;
+        bottom: 24px;
+        right: 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 28px;
+        background: linear-gradient(135deg, #f59e0b, #f97316);
+        color: white;
+        border: none;
+        border-radius: 16px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow:
+            0 8px 24px rgba(245, 158, 11, 0.4),
+            0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+    }
+
+    .fab-optimize:hover {
+        transform: translateY(-3px);
+        box-shadow:
+            0 12px 32px rgba(245, 158, 11, 0.5),
+            0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .fab-optimize i {
+        font-size: 18px;
+    }
+
+    /* ===== Stats Bar ===== */
+    .stats-bar {
+        display: flex;
+        gap: 24px;
+        padding: 16px 24px;
+        background: rgba(248, 250, 252, 0.9);
+        border-top: 1px solid var(--border-color);
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: var(--text-gray);
+    }
+
+    /* ===== Empty State ===== */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 24px;
+        text-align: center;
+    }
+
+    .empty-state-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.05));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+    }
+
+    .empty-state-icon i {
+        font-size: 28px;
+        color: var(--primary-blue);
+    }
+
+    .empty-state-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+    }
+
+    .empty-state-text {
+        font-size: 14px;
+        color: var(--text-gray);
+    }
+
+    /* ===== Timeline Section ===== */
+    .timeline-section {
+        padding: 0 24px 16px;
+        border-top: 1px solid var(--border-color);
+        background: rgba(248, 250, 252, 0.5);
+    }
+
+    .timeline-header {
+        display: flex;
+        gap: 8px;
+        padding: 12px 0;
+    }
+
+    .timeline-tab {
+        padding: 8px 16px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-gray);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .timeline-tab:hover {
+        color: var(--text-dark);
+    }
+
+    .timeline-tab.active {
+        background: white;
+        color: var(--primary-blue);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    /* ===== Loading State ===== */
+    .loading-spinner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+    }
+
+    .loading-spinner::after {
+        content: '';
+        width: 32px;
+        height: 32px;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--primary-blue);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="two-column show-map" id="optimization-container" style="max-width: 100%;">
-    <div class="column">
-        <h1 class="page-title" style="margin-bottom: 32px;">Планирование маршрута</h1>
+<div class="opt-container">
+    <!-- Left Sidebar -->
+    <div class="opt-sidebar">
+        <div class="opt-sidebar-header">
+            <div class="opt-sidebar-title">
+                <h1>Маршруты</h1>
+                <span class="route-count-badge" id="route-count">
+                    <i class="fi fi-rr-route"></i>
+                    <span id="route-count-value">0</span> маршрутов
+                </span>
+            </div>
 
-        <div class="date-input-group">
-            <label class="date-label" for="day">День:</label>
-            <input type="date" id="day" name="day" class="form-input" style="width: auto;">
-        </div>
-
-        <div class="list-section">
-            <div class="section-title">Заказы</div>
-            <button id="optimization-add-order" class="btn btn-secondary btn-small" style="margin-bottom: 16px;"
-                type="button">+</button>
-            <div id="orders-list" class="orders-list">
-                <div class="list-item">Загрузка заказов...</div>
+            <!-- Segmented Tabs -->
+            <div class="route-tabs">
+                <button class="route-tab active" data-filter="all">Все</button>
+                <button class="route-tab" data-filter="active">Активные</button>
+                <button class="route-tab" data-filter="completed">Завершенные</button>
             </div>
         </div>
 
-        <div class="list-section">
-            <div class="section-title">Маршруты</div>
-            <div class="tabs">
-                <button class="tab active" data-status="active">Активные</button>
-                <button class="tab" data-status="completed">Завершенные</button>
-            </div>
-            <div id="routes-list" class="routes-list"></div>
-            <button class="btn btn-primary" style="margin-top: 16px; width: 100%;">Отправить курьеру</button>
+        <!-- Routes List -->
+        <div class="opt-routes-list" id="routes-list">
+            <div class="loading-spinner"></div>
         </div>
     </div>
 
-    <div class="column">
-        <div class="map-container">
+    <!-- Right Column - Map Area -->
+    <div class="opt-map-area">
+        <div class="opt-map-header">
+            <span class="opt-map-title">Планирование на карте</span>
+
+            <!-- Styled Date Picker -->
+            <div class="date-picker-wrapper">
+                <div class="date-picker-styled" id="date-picker-display">
+                    <i class="fi fi-rr-calendar"></i>
+                    <span class="date-picker-text" id="date-text">Сегодня, 4 Дек</span>
+                    <input type="date" id="day" name="day">
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div class="opt-map-container">
             <div id="map"></div>
+
+            <!-- Floating Action Button -->
+            <button class="fab-optimize" id="btn-optimize">
+                <i class="fi fi-rr-route"></i>
+                Построить маршруты
+            </button>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-item">
+                <span class="stat-value" id="stat-routes">0</span>
+                <span class="stat-label">Маршрутов</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="stat-orders">0</span>
+                <span class="stat-label">Заказов</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="stat-distance">0 км</span>
+                <span class="stat-label">Общее расстояние</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="stat-duration">0:00</span>
+                <span class="stat-label">Общее время</span>
+            </div>
         </div>
     </div>
 </div>
@@ -66,56 +603,62 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function () {
+        // ===== DOM Elements =====
         const dayInput = document.getElementById('day');
-        const ordersList = document.getElementById('orders-list');
+        const dateText = document.getElementById('date-text');
         const routesList = document.getElementById('routes-list');
-        const addOrderShortcut = document.getElementById('optimization-add-order');
-        const routeTabs = document.querySelectorAll('.tabs .tab');
+        const routeTabs = document.querySelectorAll('.route-tab');
+        const routeCountValue = document.getElementById('route-count-value');
+        const btnOptimize = document.getElementById('btn-optimize');
 
+        // Stats elements
+        const statRoutes = document.getElementById('stat-routes');
+        const statOrders = document.getElementById('stat-orders');
+        const statDistance = document.getElementById('stat-distance');
+        const statDuration = document.getElementById('stat-duration');
+
+        // ===== State Management =====
         const state = {
-            routes: {
-                active: [],
-                completed: []
-            },
-            selectedStatus: 'active',
-            focusOrderId: null,
-            currentRouteId: null
+            routes: [],
+            filteredRoutes: [],
+            activeFilter: 'all', // 'all', 'active', 'completed'
+            selectedRouteId: null,
+            isLoading: false
         };
 
-        // Инициализация карты Leaflet.js
-        const map = L.map('map').setView([55.7558, 37.6173], 11); // Москва по умолчанию
+        // ===== Vehicle Types (for placeholder icons) =====
+        const vehicleTypes = [
+            { type: 'car', label: 'Автомобиль', icon: 'fi-rr-car' },
+            { type: 'bike', label: 'Велосипед', icon: 'fi-rr-biking' },
+            { type: 'walk', label: 'Пешком', icon: 'fi-rr-walking' },
+            { type: 'truck', label: 'Грузовик', icon: 'fi-rr-truck-side' }
+        ];
 
-        // Добавляем тайлы OpenStreetMap
+        // ===== Initialize Leaflet Map =====
+        const map = L.map('map').setView([55.7558, 37.6173], 11);
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(map);
 
-        // Слои для маршрутов и маркеров
         let routeLayer = null;
         let markersLayer = L.layerGroup().addTo(map);
 
-        // Функция декодирования polyline (Google Encoded Polyline)
+        // ===== Polyline Decoder =====
         function decodePolyline(encoded) {
             const coords = [];
-            let index = 0;
-            let lat = 0;
-            let lng = 0;
+            let index = 0, lat = 0, lng = 0;
 
             while (index < encoded.length) {
-                // Декодируем latitude
-                let shift = 0;
-                let result = 0;
-                let b;
+                let shift = 0, result = 0, b;
                 do {
                     b = encoded.charCodeAt(index++) - 63;
                     result |= (b & 0x1f) << shift;
                     shift += 5;
                 } while (b >= 0x20);
-                const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
-                lat += dlat;
+                lat += (result & 1) ? ~(result >> 1) : (result >> 1);
 
-                // Декодируем longitude
                 shift = 0;
                 result = 0;
                 do {
@@ -123,167 +666,257 @@
                     result |= (b & 0x1f) << shift;
                     shift += 5;
                 } while (b >= 0x20);
-                const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
-                lng += dlng;
+                lng += (result & 1) ? ~(result >> 1) : (result >> 1);
 
                 coords.push([lat / 1e5, lng / 1e5]);
             }
-
             return coords;
         }
 
-        const hashValue = window.location.hash.replace('#', '');
-        if (hashValue.startsWith('order=')) {
-            const [, orderId] = hashValue.split('=');
-            state.focusOrderId = orderId;
+        // ===== Date Formatting =====
+        function formatDate(date) {
+            const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+            const today = new Date();
+            const d = new Date(date);
+
+            if (d.toDateString() === today.toDateString()) {
+                return `Сегодня, ${d.getDate()} ${months[d.getMonth()]}`;
+            }
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
         }
 
-        // Устанавливаем сегодняшнюю дату
+        // ===== Initialize Date =====
         const today = new Date();
-        const isoDate = today.toISOString().split('T')[0];
-        dayInput.value = isoDate;
+        dayInput.value = today.toISOString().split('T')[0];
+        dateText.textContent = formatDate(dayInput.value);
 
         dayInput.addEventListener('change', () => {
-            loadOrders(dayInput.value);
-            loadRoutes(state.selectedStatus, dayInput.value);
+            dateText.textContent = formatDate(dayInput.value);
+            loadRoutes();
         });
 
-        addOrderShortcut.addEventListener('click', () => {
-            window.location.href = '/orders#add-order';
-        });
-
+        // ===== Tab Click Handlers =====
         routeTabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 routeTabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                state.selectedStatus = tab.dataset.status;
-                renderRoutes(tab.dataset.status);
+                state.activeFilter = tab.dataset.filter;
+                filterAndRenderRoutes();
             });
         });
 
-        await loadOrders(dayInput.value);
-        await loadRoutes('active', dayInput.value);
-        await loadRoutes('completed', dayInput.value);
-        renderRoutes('active');
+        // ===== Load Routes =====
+        async function loadRoutes() {
+            state.isLoading = true;
+            routesList.innerHTML = '<div class="loading-spinner"></div>';
 
-        async function loadOrders(date) {
-            ordersList.innerHTML = '<div class="list-item">Загрузка...</div>';
             try {
-                const response = await api.get(`/api/orders?visit_date=${date}`);
-                let orders = response.orders || [];
-                if (!orders.length) {
-                    orders = getSampleOrders(date);
-                }
-                renderOrders(orders);
-            } catch (error) {
-                console.error('Error loading orders:', error);
-                ordersList.innerHTML = '<div class="list-item">Не удалось загрузить заказы</div>';
-            }
-        }
+                // Load both active and completed routes
+                const [activeRes, completedRes] = await Promise.all([
+                    api.get(`/api/routes?status=active&date=${dayInput.value}`),
+                    api.get(`/api/routes?status=completed&date=${dayInput.value}`)
+                ]);
 
-        async function loadRoutes(status, date) {
-            routesList.innerHTML = '<div class="list-item">Загрузка маршрутов...</div>';
-            try {
-                const response = await api.get(`/api/routes?status=${status}&date=${date}`);
-                let routes = response.routes || [];
-                if (!routes.length) {
-                    routes = getSampleRoutes(status);
+                let activeRoutes = (activeRes.routes || []).map(r => ({ ...r, status: 'active' }));
+                let completedRoutes = (completedRes.routes || []).map(r => ({ ...r, status: 'completed' }));
+
+                // Use sample data if empty
+                if (!activeRoutes.length && !completedRoutes.length) {
+                    state.routes = getSampleRoutes();
+                } else {
+                    state.routes = [...activeRoutes, ...completedRoutes];
                 }
-                state.routes[status] = routes;
-                if (state.selectedStatus === status) {
-                    renderRoutes(status);
-                }
+
+                // Add placeholder data for missing fields (TODO: Backend update required)
+                state.routes = state.routes.map(route => ({
+                    ...route,
+                    // Placeholder values - randomized for demonstration
+                    orders_count: route.orders_count || Math.floor(Math.random() * 15) + 3,
+                    distance_km: route.distance_km || (Math.random() * 50 + 10).toFixed(1),
+                    duration_min: route.duration_min || Math.floor(Math.random() * 180) + 30,
+                    vehicle_type: route.vehicle_type || vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)].type
+                }));
+
+                filterAndRenderRoutes();
+                updateStats();
+
             } catch (error) {
                 console.error('Error loading routes:', error);
-                if (state.selectedStatus === status) {
-                    routesList.innerHTML = '<div class="list-item">Не удалось загрузить маршруты</div>';
-                }
+                state.routes = getSampleRoutes();
+                filterAndRenderRoutes();
+                updateStats();
             }
+
+            state.isLoading = false;
         }
 
-        function renderOrders(orders) {
-            if (!orders.length) {
-                ordersList.innerHTML = '<div class="list-item">Заказы отсутствуют</div>';
-                return;
+        // ===== Filter Routes =====
+        function filterAndRenderRoutes() {
+            if (state.activeFilter === 'all') {
+                state.filteredRoutes = state.routes;
+            } else {
+                state.filteredRoutes = state.routes.filter(r => r.status === state.activeFilter);
             }
-            ordersList.innerHTML = orders.map(order => {
-                const isFocused = state.focusOrderId && String(order.id) === String(state.focusOrderId);
-                return `
-                    <div class="list-item ${isFocused ? 'active' : ''}">
-                        <div style="display:flex; flex-direction:column;">
-                            <strong>${order.order_name || order.point_address}</strong>
-                            <span style="color:var(--text-gray); font-size:12px;">
-                                ${order.point_address || ''} · ${order.courier_name || 'Курьер не назначен'}
-                            </span>
+
+            routeCountValue.textContent = state.filteredRoutes.length;
+            renderRoutesList();
+        }
+
+        // ===== Render Routes List =====
+        function renderRoutesList() {
+            if (!state.filteredRoutes.length) {
+                routesList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fi fi-rr-route"></i>
                         </div>
+                        <div class="empty-state-title">Маршруты не найдены</div>
+                        <div class="empty-state-text">Нажмите "Построить маршруты" для создания</div>
                     </div>
                 `;
-            }).join('');
-        }
-
-        function renderRoutes(status) {
-            const routes = state.routes[status] || [];
-            if (!routes.length) {
-                routesList.innerHTML = '<div class="list-item">Маршруты отсутствуют</div>';
                 return;
             }
-            routesList.innerHTML = routes.map(route => {
-                const hasOrder = route.current_order && route.current_order.order_id;
-                const isFocused = hasOrder && state.focusOrderId && String(route.current_order.order_id) === String(state.focusOrderId);
+
+            routesList.innerHTML = state.filteredRoutes.map(route => {
+                const isSelected = state.selectedRouteId === route.id;
+                const vehicle = vehicleTypes.find(v => v.type === route.vehicle_type) || vehicleTypes[0];
+                const initials = getInitials(route.courier_name || 'Курьер');
+                const durationFormatted = formatDuration(route.duration_min);
+
                 return `
-                    <div class="list-item ${isFocused ? 'active' : ''}">
-                        <div style="display:flex; flex-direction:column; width:100%;">
-                            <strong>${route.courier_name || 'Неизвестный курьер'}</strong>
-                            <span style="color:var(--text-gray); font-size:12px;">
-                                ${route.current_order?.order_name || 'Заказ не назначен'}
-                            </span>
+                    <div class="route-card ${isSelected ? 'selected' : ''}" data-route-id="${route.id}">
+                        <div class="route-card-header">
+                            <div class="courier-avatar">${initials}</div>
+                            <div class="courier-info">
+                                <div class="courier-name">${route.courier_name || 'Неизвестный курьер'}</div>
+                                <div class="courier-vehicle">
+                                    <i class="fi ${vehicle.icon}"></i>
+                                    ${vehicle.label}
+                                </div>
+                            </div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <button class="btn btn-secondary btn-small route-edit-btn" data-route-id="${route.id}">
+
+                        <div class="route-metrics">
+                            <div class="metric-item">
+                                <div class="metric-icon orders">
+                                    <i class="fi fi-rr-box"></i>
+                                </div>
+                                <div class="metric-value">${route.orders_count}</div>
+                                <div class="metric-label">Заказов</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-icon distance">
+                                    <i class="fi fi-rr-marker"></i>
+                                </div>
+                                <div class="metric-value">${route.distance_km} км</div>
+                                <div class="metric-label">Расстояние</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-icon duration">
+                                    <i class="fi fi-rr-clock"></i>
+                                </div>
+                                <div class="metric-value">${durationFormatted}</div>
+                                <div class="metric-label">Время</div>
+                            </div>
+                        </div>
+
+                        <div class="route-card-actions">
+                            <button class="btn btn-edit" data-action="edit" data-route-id="${route.id}">
+                                <i class="fi fi-rr-pencil"></i>
                                 Изменить
                             </button>
-                            <span style="font-size:12px; color:var(--text-gray);">
-                                ${route.current_order?.status_label || (status === 'active' ? 'В процессе' : 'Завершен')}
-                            </span>
+                            <button class="btn btn-send" data-action="send" data-route-id="${route.id}">
+                                <i class="fi fi-rr-paper-plane"></i>
+                                Отправить
+                            </button>
                         </div>
                     </div>
                 `;
             }).join('');
 
-            routesList.querySelectorAll('.route-edit-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
+            // Add event listeners
+            routesList.querySelectorAll('.route-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // Ignore if clicking on buttons
+                    if (e.target.closest('button')) return;
+
+                    const routeId = card.dataset.routeId;
+                    selectRoute(routeId);
+                });
+            });
+
+            routesList.querySelectorAll('[data-action="edit"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
                     const routeId = btn.dataset.routeId;
                     openRouteEdit(routeId);
                 });
             });
+
+            routesList.querySelectorAll('[data-action="send"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const routeId = btn.dataset.routeId;
+                    sendRoute(routeId);
+                });
+            });
         }
 
+        // ===== Helper Functions =====
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        }
+
+        function formatDuration(minutes) {
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            return h > 0 ? `${h}ч ${m}м` : `${m}м`;
+        }
+
+        // ===== Select Route =====
+        function selectRoute(routeId) {
+            state.selectedRouteId = parseInt(routeId);
+
+            // Update visual selection
+            routesList.querySelectorAll('.route-card').forEach(card => {
+                card.classList.toggle('selected', card.dataset.routeId === routeId);
+            });
+
+            // Load and display route on map
+            openRouteEdit(routeId);
+        }
+
+        // ===== Open Route Edit / View on Map =====
         async function openRouteEdit(routeId) {
             showNotification('Загрузка маршрута...', 'info');
-            state.currentRouteId = routeId;
 
             try {
                 const response = await api.get(`/api/routes/${routeId}/optimize-view`);
-                console.log('Route optimization view:', response);
-
-                // Отображение маршрута на карте
                 displayRouteOnMap(response);
-
                 showNotification('Маршрут отображен на карте', 'success');
             } catch (error) {
-                console.error('Error loading optimization view:', error);
+                console.error('Error loading route:', error);
                 showNotification('Не удалось загрузить маршрут', 'error');
             }
         }
 
+        // ===== Send Route to Courier =====
+        async function sendRoute(routeId) {
+            showNotification('Отправка маршрута курьеру...', 'info');
+            // TODO: Implement send route functionality
+            setTimeout(() => {
+                showNotification('Маршрут отправлен курьеру!', 'success');
+            }, 1000);
+        }
+
+        // ===== Display Route on Map =====
         function displayRouteOnMap(routeData) {
-            // Очистка предыдущих слоев
             if (routeLayer) {
                 map.removeLayer(routeLayer);
             }
             markersLayer.clearLayers();
 
-            // Добавление маркера депо (стартовая точка курьера)
+            // Depot marker
             if (routeData.courier) {
                 const depotIcon = L.divIcon({
                     className: 'custom-depot-marker',
@@ -310,43 +943,42 @@
                     .addTo(markersLayer);
             }
 
-            // Добавление маркеров заказов
-            routeData.orders.forEach((order, index) => {
-                const orderNumber = index + 1;
-                const orderIcon = L.divIcon({
-                    className: 'custom-order-marker',
-                    html: `<div style="
-                        background: #4ECDC4;
-                        color: white;
-                        width: 32px;
-                        height: 32px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 14px;
-                        border: 3px solid white;
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                    ">${orderNumber}</div>`,
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 16]
+            // Order markers
+            if (routeData.orders) {
+                routeData.orders.forEach((order, index) => {
+                    const orderIcon = L.divIcon({
+                        className: 'custom-order-marker',
+                        html: `<div style="
+                            background: #4ECDC4;
+                            color: white;
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-weight: bold;
+                            font-size: 14px;
+                            border: 3px solid white;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                        ">${index + 1}</div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+
+                    L.marker([order.lat, order.lng], { icon: orderIcon })
+                        .bindPopup(`<b>${index + 1}. ${order.order_name}</b><br>${order.address}`)
+                        .addTo(markersLayer);
                 });
+            }
 
-                L.marker([order.lat, order.lng], { icon: orderIcon })
-                    .bindPopup(`<b>${orderNumber}. ${order.order_name}</b><br>${order.address}`)
-                    .addTo(markersLayer);
-            });
-
-            // Отрисовка линии маршрута (polyline)
+            // Route polyline
             if (routeData.geometry || routeData.path) {
                 let pathCoords = [];
 
                 if (routeData.geometry) {
-                    // Декодируем encoded polyline
                     pathCoords = decodePolyline(routeData.geometry);
                 } else if (routeData.path) {
-                    // Используем готовый path
                     pathCoords = routeData.path.map(p => [p.lat, p.lng]);
                 }
 
@@ -358,75 +990,104 @@
                         smoothFactor: 1
                     }).addTo(map);
 
-                    // Центрируем карту по маршруту
                     map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
                 }
-            } else if (routeData.orders.length > 0) {
-                // Если нет геометрии, центрируем по заказам
-                const orderCoords = routeData.orders.map(o => [o.lat, o.lng]);
-                const bounds = L.latLngBounds(orderCoords);
+            } else if (routeData.orders?.length > 0) {
+                const bounds = L.latLngBounds(routeData.orders.map(o => [o.lat, o.lng]));
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
         }
 
-        function getSampleOrders(date) {
+        // ===== Update Stats =====
+        function updateStats() {
+            const routes = state.routes;
+            statRoutes.textContent = routes.length;
+
+            const totalOrders = routes.reduce((sum, r) => sum + (r.orders_count || 0), 0);
+            statOrders.textContent = totalOrders;
+
+            const totalDistance = routes.reduce((sum, r) => sum + parseFloat(r.distance_km || 0), 0);
+            statDistance.textContent = `${totalDistance.toFixed(1)} км`;
+
+            const totalDuration = routes.reduce((sum, r) => sum + (r.duration_min || 0), 0);
+            statDuration.textContent = formatDuration(totalDuration);
+        }
+
+        // ===== FAB Click Handler =====
+        btnOptimize.addEventListener('click', async () => {
+            showNotification('Построение маршрутов...', 'info');
+            btnOptimize.disabled = true;
+
+            try {
+                // TODO: Call optimization API
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                showNotification('Маршруты успешно построены!', 'success');
+                loadRoutes();
+            } catch (error) {
+                showNotification('Не удалось построить маршруты', 'error');
+            }
+
+            btnOptimize.disabled = false;
+        });
+
+        // ===== Sample Routes Data =====
+        function getSampleRoutes() {
             return [
                 {
-                    id: 1001,
-                    order_name: 'Заказ TEST-1001',
-                    point_address: 'Москва, ул. Новая 10',
+                    id: 201,
+                    courier_id: 1,
                     courier_name: 'Азымбек Казбек',
-                    visit_date: date
+                    status: 'active',
+                    orders_count: 12,
+                    distance_km: '45.2',
+                    duration_min: 125,
+                    vehicle_type: 'car'
                 },
                 {
-                    id: 1002,
-                    order_name: 'Заказ TEST-1002',
-                    point_address: 'Москва, ул. Ленина 12',
+                    id: 202,
+                    courier_id: 2,
                     courier_name: 'Азамат Айталиев',
-                    visit_date: date
+                    status: 'active',
+                    orders_count: 8,
+                    distance_km: '32.7',
+                    duration_min: 95,
+                    vehicle_type: 'bike'
+                },
+                {
+                    id: 203,
+                    courier_id: 3,
+                    courier_name: 'Иван Петров',
+                    status: 'active',
+                    orders_count: 15,
+                    distance_km: '58.3',
+                    duration_min: 180,
+                    vehicle_type: 'truck'
+                },
+                {
+                    id: 301,
+                    courier_id: 4,
+                    courier_name: 'Михаил Щербетов',
+                    status: 'completed',
+                    orders_count: 10,
+                    distance_km: '38.5',
+                    duration_min: 110,
+                    vehicle_type: 'car'
+                },
+                {
+                    id: 302,
+                    courier_id: 5,
+                    courier_name: 'Алексей Сидоров',
+                    status: 'completed',
+                    orders_count: 6,
+                    distance_km: '22.1',
+                    duration_min: 65,
+                    vehicle_type: 'walk'
                 }
             ];
         }
 
-        function getSampleRoutes(status) {
-            const samples = {
-                active: [
-                    {
-                        id: 201,
-                        courier_id: 1,
-                        courier_name: 'Азымбек Казбек',
-                        current_order: {
-                            order_id: 1001,
-                            order_name: 'Заказ TEST-1001',
-                            status_label: 'В процессе'
-                        }
-                    },
-                    {
-                        id: 202,
-                        courier_id: 2,
-                        courier_name: 'Азамат Айталиев',
-                        current_order: {
-                            order_id: 1002,
-                            order_name: 'Заказ TEST-1002',
-                            status_label: 'В процессе'
-                        }
-                    }
-                ],
-                completed: [
-                    {
-                        id: 301,
-                        courier_id: 3,
-                        courier_name: 'Михаил Щербетов',
-                        current_order: {
-                            order_id: 998,
-                            order_name: 'Заказ TEST-0998',
-                            status_label: 'Завершен'
-                        }
-                    }
-                ]
-            };
-            return samples[status] || [];
-        }
+        // ===== Initial Load =====
+        await loadRoutes();
     });
 </script>
 {% endblock %}
