@@ -61,6 +61,9 @@ class Courier(db.Model):
     phone = db.Column(db.String(50), unique=True)
     telegram = db.Column(db.String(100))
     
+    # Тип транспорта для отображения (car, truck, bicycle, scooter)
+    vehicle_type = db.Column(db.String(50), default='car')
+    
     # Профиль транспорта для OpenRouteService
     # driving-car, driving-hgv, cycling-regular, cycling-road, cycling-mountain, foot-walking, foot-hiking
     profile = db.Column(db.String(50), default='driving-car')
@@ -89,6 +92,7 @@ class Courier(db.Model):
             'full_name': self.full_name,
             'phone': self.phone,
             'telegram': self.telegram,
+            'vehicle_type': self.vehicle_type,
             'profile': self.profile,
             'capacity': self.capacity,
             'start_lat': self.start_lat,
@@ -129,6 +133,12 @@ class Order(db.Model):
     # Статус: planned, in_progress, completed
     status = db.Column(db.String(20), default='planned')
     
+    # Прямое закрепление курьера за заказом
+    courier_id = db.Column(db.Integer, db.ForeignKey('couriers.id'), nullable=True)
+    
+    # Точка отправления
+    point_id = db.Column(db.Integer, db.ForeignKey('points.id'), nullable=True)
+    
     # Привязка к маршруту
     route_id = db.Column(db.Integer, db.ForeignKey('routes.id'), nullable=True)
     
@@ -140,8 +150,13 @@ class Order(db.Model):
     
     def to_dict(self):
         """Сериализация в словарь для JSON"""
+        # Получаем имя курьера из прямой связи или через маршрут
         courier_name = None
-        if self.route_id and self.route and self.route.courier:
+        if self.courier_id:
+            courier = Courier.query.get(self.courier_id)
+            if courier:
+                courier_name = courier.full_name
+        elif self.route_id and self.route and self.route.courier:
             courier_name = self.route.courier.full_name
         
         return {
@@ -159,6 +174,8 @@ class Order(db.Model):
             'comment': self.comment,
             'company': self.company,
             'status': self.status,
+            'courier_id': self.courier_id,
+            'point_id': self.point_id,
             'route_id': self.route_id,
             'courier_name': courier_name,
             'created_at': self.created_at.isoformat() if self.created_at else None

@@ -482,8 +482,12 @@ def api_orders():
         visit_date = request.args.get('visit_date', None)
         search = request.args.get('search', None)
         
-        # Базовый запрос
-        query = Order.query
+        # Базовый запрос - фильтрация по текущему пользователю
+        user_id = session.get('user_id')
+        if user_id:
+            query = Order.query.filter_by(user_id=user_id)
+        else:
+            query = Order.query  # Для неавторизованных - все данные
         
         # Применение фильтров
         if status:
@@ -542,8 +546,24 @@ def api_orders():
         if not address:
             return jsonify({'success': False, 'message': 'Адрес обязателен'}), 400
         
-        # Создание заказа
+        # Преобразование courier_id и point_id в int, если они есть
+        courier_id = None
+        if data.get('courier_id'):
+            try:
+                courier_id = int(data['courier_id'])
+            except (ValueError, TypeError):
+                courier_id = None
+        
+        point_id = None
+        if data.get('point_id'):
+            try:
+                point_id = int(data['point_id'])
+            except (ValueError, TypeError):
+                point_id = None
+        
+        # Создание заказа с привязкой к текущему пользователю
         order = Order(
+            user_id=session.get('user_id'),
             order_name=data.get('order_name'),
             destination_point=data.get('destination_point', ''),
             address=address,
@@ -554,16 +574,27 @@ def api_orders():
             recipient_phone=data.get('recipient_phone'),
             comment=data.get('comment'),
             company=data.get('company'),
+            courier_id=courier_id,
+            point_id=point_id,
             status='planned'
         )
         
-        # Геокодирование адреса
-        coords = optimizer.geocode_address(address)
-        if coords:
-            order.lon, order.lat = coords[0], coords[1]
-        else:
-            # Если геокодирование не удалось, все равно создаем заказ
-            print(f"⚠️  Заказ создан без координат: {address}")
+        # Если координаты уже переданы с фронтенда, используем их
+        if data.get('destination_lat') and data.get('destination_lon'):
+            try:
+                order.lat = float(data['destination_lat'])
+                order.lon = float(data['destination_lon'])
+            except (ValueError, TypeError):
+                pass
+        
+        # Если координат нет, пробуем геокодировать
+        if not order.lat or not order.lon:
+            coords = optimizer.geocode_address(address)
+            if coords:
+                order.lon, order.lat = coords[0], coords[1]
+            else:
+                # Если геокодирование не удалось, все равно создаем заказ
+                print(f"⚠️  Заказ создан без координат: {address}")
         
         db.session.add(order)
         db.session.commit()
@@ -603,7 +634,7 @@ def api_order(order_id):
         order = Order.query.get(order_id)
         if not order:
             return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
-        return jsonify(order.to_dict())
+        return jsonify({'success': True, 'order': order.to_dict()})
     elif request.method == 'DELETE':
         """
         DELETE /api/orders/<id> - Удаление заказа
@@ -655,22 +686,61 @@ def api_order(order_id):
         # Обновление полей
         if 'order_name' in data:
             order.order_name = data['order_name']
+        
         if 'address' in data or 'destination_point' in data:
-            new_address = data.get('address') or data.get('destination_point')
+            new_address = data.get('destination_point') or data.get('address')
             order.address = new_address
-            order.destination_point = data.get('destination_point', '')
-            # Перегеокодируем адрес
-            coords = optimizer.geocode_address(new_address)
-            if coords:
-                order.lon, order.lat = coords[0], coords[1]
+            order.destination_point = data.get('destination_point', new_address)
+            
+            # Используем координаты с фронтенда если они есть
+            if data.get('destination_lat') and data.get('destination_lon'):
+                try:
+                    order.lat = float(data['destination_lat'])
+                    order.lon = float(data['destination_lon'])
+                except (ValueError, TypeError):
+                    pass
+            else:
+                # Иначе перегеокодируем адрес
+                coords = optimizer.geocode_address(new_address)
+                if coords:
+                    order.lon, order.lat = coords[0], coords[1]
+        
         if 'visit_date' in data:
             order.visit_date = data['visit_date']
         if 'visit_time' in data:
             order.visit_time = data['visit_time']
+        if 'time_at_point' in data:
+            order.time_at_point = data['time_at_point']
         if 'status' in data:
             order.status = data['status']
         if 'comment' in data:
             order.comment = data['comment']
+        if 'recipient_name' in data:
+            order.recipient_name = data['recipient_name']
+        if 'recipient_phone' in data:
+            order.recipient_phone = data['recipient_phone']
+        if 'company' in data:
+            order.company = data['company']
+        
+        # Обработка courier_id
+        if 'courier_id' in data:
+            if data['courier_id']:
+                try:
+                    order.courier_id = int(data['courier_id'])
+                except (ValueError, TypeError):
+                    order.courier_id = None
+            else:
+                order.courier_id = None
+        
+        # Обработка point_id
+        if 'point_id' in data:
+            if data['point_id']:
+                try:
+                    order.point_id = int(data['point_id'])
+                except (ValueError, TypeError):
+                    order.point_id = None
+            else:
+                order.point_id = None
         
         db.session.commit()
         return jsonify({'success': True, 'message': 'Заказ обновлен'})
@@ -871,8 +941,12 @@ def api_routes():
         courier_id = request.args.get('courier_id', None, type=int)
         status = request.args.get('status', None)
         
-        # Базовый запрос
-        query = Route.query
+        # Базовый запрос - фильтрация по текущему пользователю
+        user_id = session.get('user_id')
+        if user_id:
+            query = Route.query.filter_by(user_id=user_id)
+        else:
+            query = Route.query  # Для неавторизованных - все данные
         
         # Применение фильтров
         if date:
@@ -915,8 +989,9 @@ def api_routes():
         if not courier:
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
         
-        # Создание маршрута
+        # Создание маршрута с привязкой к текущему пользователю
         route = Route(
+            user_id=session.get('user_id'),
             courier_id=data['courier_id'],
             date=data['date'],
             status=data.get('status', 'active')
@@ -1039,10 +1114,14 @@ def api_routes_optimize():
     
     date = data['date']
     courier_id = data.get('courier_id')
+    user_id = session.get('user_id')
     
-    # Если курьер не указан, берем первого доступного
+    # Если курьер не указан, берем первого доступного курьера текущего пользователя
     if not courier_id:
-        courier = Courier.query.first()
+        if user_id:
+            courier = Courier.query.filter_by(user_id=user_id).first()
+        else:
+            courier = Courier.query.first()  # Для неавторизованных - любой курьер
         if not courier:
             return jsonify({'success': False, 'message': 'Нет доступных курьеров'}), 400
         courier_id = courier.id
@@ -1051,12 +1130,16 @@ def api_routes_optimize():
         if not courier:
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
     
-    # Выборка нераспределенных заказов на дату
-    orders = Order.query.filter_by(
+    # Выборка нераспределенных заказов на дату для текущего пользователя
+    orders_query = Order.query.filter_by(
         visit_date=date,
         route_id=None,
         status='planned'
-    ).all()
+    )
+    if user_id:
+        orders_query = orders_query.filter_by(user_id=user_id)
+    # Для неавторизованных - все заказы без фильтрации по user_id
+    orders = orders_query.all()
     
     if not orders:
         return jsonify({
@@ -1073,8 +1156,9 @@ def api_routes_optimize():
             'message': 'Не удалось построить маршрут. Проверьте настройки ORS API.'
         }), 500
     
-    # Создание маршрута в БД
+    # Создание маршрута в БД с привязкой к текущему пользователю
     route = Route(
+        user_id=user_id,
         courier_id=courier.id,
         date=date,
         status='active',
@@ -1220,7 +1304,12 @@ def api_couriers():
     }
     """
     if request.method == 'GET':
-        couriers = Courier.query.all()
+        # Фильтрация по текущему пользователю
+        user_id = session.get('user_id')
+        if user_id:
+            couriers = Courier.query.filter_by(user_id=user_id).all()
+        else:
+            couriers = Courier.query.all()  # Для неавторизованных - все данные
         return jsonify({
             'couriers': [courier.to_dict() for courier in couriers]
         })
@@ -1262,9 +1351,12 @@ def api_couriers():
                 return jsonify({'success': False, 'message': 'Курьер с таким телефоном уже существует'}), 400
         
         courier = Courier(
+            user_id=session.get('user_id'),
             full_name=data['full_name'],
             phone=data.get('phone'),
             telegram=data.get('telegram'),
+            vehicle_type=data.get('vehicle_type', 'car'),
+            auth_key=data.get('auth_key'),
             profile=data.get('profile', 'driving-car'),
             capacity=data.get('capacity', 100),
             start_lat=data.get('start_lat', 55.7558),
@@ -1329,6 +1421,10 @@ def api_courier(courier_id):
             courier.phone = data['phone']
         if 'telegram' in data:
             courier.telegram = data['telegram']
+        if 'vehicle_type' in data:
+            courier.vehicle_type = data['vehicle_type']
+        if 'auth_key' in data:
+            courier.auth_key = data['auth_key']
         if 'profile' in data:
             courier.profile = data['profile']
         if 'capacity' in data:
@@ -1391,7 +1487,12 @@ def api_points():
     }
     """
     if request.method == 'GET':
-        points = Point.query.all()
+        # Фильтрация по текущему пользователю
+        user_id = session.get('user_id')
+        if user_id:
+            points = Point.query.filter_by(user_id=user_id).all()
+        else:
+            points = Point.query.all()  # Для неавторизованных - все данные
         return jsonify({'points': [point.to_dict() for point in points]})
     else:
         """
@@ -1423,12 +1524,14 @@ def api_points():
         if not address:
             return jsonify({'success': False, 'message': 'Адрес обязателен'}), 400
             
-        # Если make_primary=true, снимаем флаг с других точек
+        # Если make_primary=true, снимаем флаг с других точек этого пользователя
+        user_id = session.get('user_id')
         make_primary = data.get('make_primary', False)
         if make_primary:
-            Point.query.update({Point.is_primary: False})
+            Point.query.filter_by(user_id=user_id).update({Point.is_primary: False})
             
         point = Point(
+            user_id=user_id,
             address=address,
             is_primary=make_primary,
             latitude=data.get('latitude') or data.get('lat'),
@@ -1460,7 +1563,7 @@ def api_point(point_id):
         point = Point.query.get(point_id)
         if not point:
             return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
-        return jsonify(point.to_dict())
+        return jsonify({'success': True, 'point': point.to_dict()})
     elif request.method == 'PUT':
         """
         PUT /api/points/<id> - Обновление точки отправки
@@ -1492,8 +1595,8 @@ def api_point(point_id):
             make_primary = data['make_primary']
             point.is_primary = make_primary
             if make_primary:
-                # Снимаем флаг с других точек
-                Point.query.filter(Point.id != point_id).update({Point.is_primary: False})
+                # Снимаем флаг с других точек этого пользователя
+                Point.query.filter(Point.id != point_id, Point.user_id == point.user_id).update({Point.is_primary: False})
                 
         if 'latitude' in data:
             point.latitude = data['latitude']
@@ -1603,16 +1706,30 @@ def api_account_profile():
         }
     }
     """
+    # Получение текущего пользователя из сессии
+    user = None
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+    
     if request.method == 'GET':
-        # TODO: Получение данных профиля из БД
-        return jsonify({
-            'profile': {
-                'company_name': '',
-                'email': '',
-                'phone': '',
-                'activity': ''
-            }
-        })
+        if user:
+            return jsonify({
+                'profile': {
+                    'company_name': user.company_name or '',
+                    'email': user.email or '',
+                    'phone': user.phone or '',
+                    'activity': user.activity or ''
+                }
+            })
+        else:
+            return jsonify({
+                'profile': {
+                    'company_name': '',
+                    'email': '',
+                    'phone': '',
+                    'activity': ''
+                }
+            })
     else:
         """
         PUT /api/account/profile - Обновление данных профиля
@@ -1625,9 +1742,22 @@ def api_account_profile():
             "activity": "string"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Сохранение профиля в БД
-        data = request.json
+        if not user:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        
+        data = request.json or {}
+        
+        # Обновление данных профиля
+        if 'company_name' in data:
+            user.company_name = data['company_name']
+        if 'email' in data:
+            user.email = data['email']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'activity' in data:
+            user.activity = data['activity']
+        
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Профиль обновлен'})
 
 @app.route('/api/account/security', methods=['PUT'])

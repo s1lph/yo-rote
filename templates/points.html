@@ -4,6 +4,9 @@
 {% block title %}Точки отправки - yo.route{% endblock %}
 
 {% block extra_css %}
+<!-- Leaflet.js CSS for map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
     /* Autocomplete dropdown styles */
     .autocomplete-dropdown {
@@ -11,21 +14,23 @@
         top: 100%;
         left: 0;
         right: 0;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
         margin-top: 4px;
         max-height: 300px;
         overflow-y: auto;
         z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     }
 
     .autocomplete-item {
-        padding: 12px 16px;
+        padding: 14px 18px;
         cursor: pointer;
-        border-bottom: 1px solid var(--border-color);
-        transition: background 0.2s;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
     }
 
     .autocomplete-item:last-child {
@@ -33,12 +38,19 @@
     }
 
     .autocomplete-item:hover {
-        background: var(--hover-bg);
+        background: rgba(0, 0, 0, 0.05);
     }
 
     .autocomplete-item-label {
         font-size: 14px;
-        color: var(--text-color);
+        color: #1a1a1a;
+        line-height: 1.4;
+    }
+
+    #point-preview-map {
+        width: 100%;
+        height: 400px;
+        border-radius: 12px;
     }
 </style>
 {% endblock %}
@@ -86,8 +98,8 @@
             <button type="submit" class="btn btn-primary">Сохранить</button>
         </form>
 
-        <div class="map-container" style="margin-top: 24px; min-height: 400px;">
-            <div>Интерфейс добавления точки</div>
+        <div class="map-container" style="margin-top: 24px;">
+            <div id="point-preview-map"></div>
         </div>
     </div>
 </div>
@@ -112,6 +124,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Leaflet.js Library -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function () {
         const addPointBtn = document.getElementById('add-point-btn');
@@ -133,6 +148,10 @@
         const addressAutocomplete = document.getElementById('address-autocomplete');
         const pointLatInput = document.getElementById('point_lat');
         const pointLonInput = document.getElementById('point_lon');
+
+        // Leaflet map для превью точки
+        let previewMap = null;
+        let previewMarker = null;
 
         const state = {
             points: []
@@ -310,6 +329,46 @@
             pointLonInput.value = suggestion.lon;
             addressAutocomplete.style.display = 'none';
             selectedAddress = suggestion;
+
+            // Обновляем карту с новой локацией
+            updateMapPreview(suggestion.lat, suggestion.lon, suggestion.label);
+        }
+
+        // Инициализация превью карты
+        function initPreviewMap() {
+            if (!previewMap) {
+                previewMap = L.map('point-preview-map').setView([55.7558, 37.6173], 11);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(previewMap);
+            }
+        }
+
+        // Обновление карты с маркером
+        function updateMapPreview(lat, lon, label) {
+            initPreviewMap();
+
+            // Удаляем предыдущий маркер
+            if (previewMarker) {
+                previewMap.removeLayer(previewMarker);
+            }
+
+            // Создаем иконку маркера
+            const markerIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background: #4CAF50; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="fi fi-sr-marker" style="font-size: 14px;"></i></div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            // Добавляем маркер
+            previewMarker = L.marker([lat, lon], { icon: markerIcon })
+                .bindPopup(`<b>Выбранная локация</b><br>${label}`)
+                .addTo(previewMap);
+
+            // Центрируем карту на маркере
+            previewMap.setView([lat, lon], 15);
         }
 
         addressInput.addEventListener('input', (e) => {
