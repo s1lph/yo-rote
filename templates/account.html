@@ -127,6 +127,10 @@
                     <i class="fi fi-sr-check-circle"></i>
                     Профиль активен
                 </span>
+                <button class="btn-logout" id="logout-btn">
+                    <i class="fi fi-sr-sign-out-alt"></i>
+                    Выйти из аккаунта
+                </button>
             </div>
         </div>
     </div>
@@ -278,6 +282,34 @@
         font-size: 14px;
     }
 
+    .btn-logout {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px 16px;
+        margin-top: 12px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 10px;
+        color: #ef4444;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-logout:hover {
+        background: #ef4444;
+        color: white;
+        border-color: #ef4444;
+    }
+
+    .btn-logout i {
+        font-size: 14px;
+    }
+
     @media (max-width: 900px) {
         .account-layout {
             flex-direction: column-reverse;
@@ -341,6 +373,35 @@
                 });
             }
         });
+
+        // Выход из аккаунта
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async function () {
+                if (confirm('Вы уверены, что хотите выйти из аккаунта?')) {
+                    try {
+                        const response = await fetch('/api/logout', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            showNotification('Выход выполнен', 'success');
+                            setTimeout(() => {
+                                window.location.href = '/login';
+                            }, 500);
+                        } else {
+                            showNotification(result.message || 'Ошибка при выходе', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                        showNotification('Ошибка соединения с сервером', 'error');
+                    }
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

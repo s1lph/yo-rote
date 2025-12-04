@@ -1,24 +1,154 @@
 """
 yo.route - Route Optimization Module
-Модуль оптимизации маршрутов с использованием OpenRouteService API
+Модуль оптимизации маршрутов с использованием OpenRouteService API (VRP)
 """
 
 import os
 import openrouteservice
 from openrouteservice import optimization
 
-# Получаем API ключ из переменной окружения
+# Получаем API ключ
 ORS_API_KEY = os.getenv('ORS_API_KEY', '')
 
-# Инициализация клиента ORS
+# Инициализация клиента
 client = None
 if ORS_API_KEY:
     try:
         client = openrouteservice.Client(key=ORS_API_KEY)
     except Exception as e:
-        print(f"⚠️  Ошибка инициализации ORS клиента: {e}")
+        print(f"⚠️ Ошибка инициализации ORS: {e}")
 else:
-    print("⚠️  ORS_API_KEY не установлен. Функции геокодинга и оптимизации будут недоступны.")
+    print("⚠️ ORS_API_KEY не найден.")
+
+
+def solve_vrp(orders, couriers, depot=None):
+    """
+    Решает задачу маршрутизации (VRP): распределяет заказы по курьерам.
+    
+    Args:
+        orders (list): Список объектов Order (SQLAlchemy models)
+        couriers (list): Список объектов Courier (SQLAlchemy models)
+        depot (dict): Координаты точки отправки {'lat': float, 'lon': float}
+        
+    Returns:
+        list: Список словарей с результатами для каждого маршрута:
+        [
+            {
+                'courier_id': int,
+                'geometry': str (encoded polyline),
+                'order_ids': list[int] (в порядке посещения),
+                'summary': dict (distance, duration)
+            },
+            ...
+        ]
+    """
+    if not client:
+        print("❌ ORS клиент не готов")
+        return []
+
+    if not orders or not couriers:
+        return []
+
+    # Координаты депо (точки отправки)
+    if depot and depot.get('lat') and depot.get('lon'):
+        depot_coords = [depot['lon'], depot['lat']]  # ORS использует [lon, lat]
+    else:
+        # Дефолт: Москва
+        depot_coords = [37.6173, 55.7558]
+        print("⚠️ Депо не указано, используется Москва по умолчанию")
+
+    # 1. Подготовка Jobs (Заказов)
+    jobs = []
+    valid_orders_map = {}  # id -> order object
+
+    for order in orders:
+        if not order.lat or not order.lon:
+            print(f"⚠️ Пропуск заказа ID {order.id}: нет координат")
+            continue
+        
+        valid_orders_map[order.id] = order
+        
+        # Время на точке (в секундах). Если не указано, берем 5 минут (300с)
+        service_duration = (order.time_at_point or 5) * 60
+        
+        jobs.append(optimization.Job(
+            id=order.id,
+            location=[order.lon, order.lat],
+            service=service_duration,
+            # Можно добавить time_windows, если они есть в модели
+            # time_windows=[[start_sec, end_sec]] 
+        ))
+
+    if not jobs:
+        return []
+
+    # 2. Подготовка Vehicles (Курьеров)
+    vehicles = []
+    courier_map = {}  # vehicle_id -> courier object
+
+    for courier in couriers:
+        courier_map[courier.id] = courier
+        
+        # Профиль транспорта (конвертация из вашей модели в ORS)
+        # Ваши типы: car, truck, bicycle, scooter
+        # ORS профили: driving-car, driving-hgv, cycling-regular
+        profile = 'driving-car'
+        if courier.vehicle_type == 'truck':
+            profile = 'driving-hgv'
+        elif courier.vehicle_type in ['bicycle', 'scooter']:
+            profile = 'cycling-regular'
+        elif courier.vehicle_type == 'walk':
+            profile = 'foot-walking'
+
+        vehicles.append(optimization.Vehicle(
+            id=courier.id,
+            profile=profile,
+            start=depot_coords,  # Все курьеры стартуют из депо (Точки отправки)
+            end=depot_coords,    # И возвращаются обратно
+            capacity=[courier.capacity or 50],  # Вместимость (например, кол-во заказов)
+            # time_window=[start_work_sec, end_work_sec] # Можно добавить график работы
+        ))
+
+    # 3. Отправка запроса в ORS
+    try:
+        print(f"🚀 Запуск VRP: {len(jobs)} заказов, {len(vehicles)} курьеров")
+        response = client.optimization(
+            jobs=jobs,
+            vehicles=vehicles,
+            geometry=True
+        )
+    except Exception as e:
+        print(f"❌ Ошибка API оптимизации: {e}")
+        return []
+
+    # 4. Разбор ответа
+    results = []
+    
+    if 'routes' in response:
+        for route in response['routes']:
+            vehicle_id = route['vehicle']  # Это ID нашего курьера
+            
+            # Собираем ID заказов в порядке следования
+            sorted_order_ids = []
+            for step in route['steps']:
+                if step['type'] == 'job':
+                    sorted_order_ids.append(step['id'])
+            
+            if not sorted_order_ids:
+                continue  # Пустой маршрут (курьер не задействован)
+
+            results.append({
+                'courier_id': vehicle_id,
+                'geometry': route.get('geometry'),
+                'order_ids': sorted_order_ids,
+                'summary': {
+                    'distance': route.get('distance', 0),
+                    'duration': route.get('duration', 0)
+                }
+            })
+            
+    print(f"✅ Успешно построено маршрутов: {len(results)}")
+    return results
 
 
 def geocode_address(address, country='RU'):
@@ -53,100 +183,6 @@ def geocode_address(address, country='RU'):
     except Exception as e:
         print(f"❌ Ошибка геокодинга для адреса '{address}': {e}")
         return None
-
-
-def build_route(orders, courier):
-    """
-    Построение оптимального маршрута для курьера с использованием VRP алгоритма
-    
-    Args:
-        orders (list): Список объектов Order для включения в маршрут
-        courier (Courier): Объект курьера
-    
-    Returns:
-        tuple: (geometry_string, sorted_orders_list) или (None, []) при ошибке
-            - geometry_string: encoded polyline геометрия маршрута
-            - sorted_orders_list: список заказов в оптимальном порядке посещения
-    """
-    if not client:
-        print("❌ Оптимизация недоступна: ORS клиент не инициализирован")
-        return None, []
-    
-    jobs = []
-    valid_orders = []
-    
-    # Подготовка заказов для VRP
-    for order in orders:
-        # Проверяем наличие координат
-        if not order.lat or not order.lon:
-            # Пытаемся геокодировать адрес
-            coords = geocode_address(order.address)
-            if coords:
-                order.lon, order.lat = coords[0], coords[1]
-            else:
-                print(f"⚠️  Пропуск заказа {order.order_name}: координаты недоступны")
-                continue
-        
-        valid_orders.append(order)
-        
-        # Создаем VRP job для заказа
-        # Service time указывается в секундах
-        service_time = (order.time_at_point or 15) * 60  # конвертируем минуты в секунды
-        
-        jobs.append(optimization.Job(
-            id=order.id,
-            location=[order.lon, order.lat],
-            service=service_time
-        ))
-    
-    if not jobs:
-        print("❌ Нет валидных заказов для оптимизации")
-        return None, []
-    
-    # Создаем транспортное средство (курьера)
-    vehicle = optimization.Vehicle(
-        id=courier.id,
-        profile=courier.profile,
-        start=[courier.start_lon, courier.start_lat],
-        end=[courier.start_lon, courier.start_lat],  # возвращается на базу
-        capacity=[courier.capacity]
-    )
-    
-    try:
-        print(f"🔄 Запуск оптимизации для {len(jobs)} заказов...")
-        
-        # Вызов API ORS Optimization
-        response = client.optimization(
-            jobs=jobs,
-            vehicles=[vehicle],
-            geometry=True  # запрашиваем геометрию маршрута
-        )
-        
-        if 'routes' in response and response['routes']:
-            route_data = response['routes'][0]
-            
-            # Получаем отсортированный список заказов согласно оптимальному маршруту
-            sorted_orders = []
-            for step in route_data['steps']:
-                if step['type'] == 'job':
-                    # Находим оригинальный заказ по ID
-                    original_order = next((o for o in valid_orders if o.id == step['id']), None)
-                    if original_order:
-                        sorted_orders.append(original_order)
-            
-            geometry = route_data.get('geometry', '')
-            
-            print(f"✅ Оптимизация завершена успешно: {len(sorted_orders)} заказов")
-            print(f"   Геометрия маршрута: {len(geometry)} символов")
-            
-            return geometry, sorted_orders
-        else:
-            print("❌ Ответ ORS не содержит маршрутов")
-            return None, []
-            
-    except Exception as e:
-        print(f"❌ Ошибка оптимизации: {e}")
-        return None, []
 
 
 def decode_polyline(encoded):

@@ -84,9 +84,11 @@
                     <tr>
                         <th style="width: 40px;"></th>
                         <th>Название заказа</th>
+                        <th>Точка отправки</th>
                         <th>Адрес получателя</th>
                         <th>Дата доставки</th>
                         <th>Время доставки</th>
+                        <th>Время на точке</th>
                         <th>Статус</th>
                         <th>Курьер</th>
                         <th>Компания</th>
@@ -159,7 +161,12 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="recipient_name">ФИО</label>
+                <label class="form-label" for="company">Компания</label>
+                <input type="text" id="company" name="company" class="form-input" placeholder="Название компании">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="recipient_name">ФИО получателя</label>
                 <input type="text" id="recipient_name" name="recipient_name" class="form-input" required>
             </div>
 
@@ -779,6 +786,7 @@
                 document.getElementById('visit_date').value = order.visit_date || '';
                 document.getElementById('visit_time').value = order.visit_time || '';
                 document.getElementById('time_at_point').value = order.time_at_point || '';
+                document.getElementById('company').value = order.company || '';
                 document.getElementById('recipient_name').value = order.recipient_name || '';
                 document.getElementById('recipient_phone').value = order.recipient_phone || '';
                 document.getElementById('comment').value = order.comment || '';
@@ -873,7 +881,10 @@
                 if (previewMarkersLayer) {
                     previewMarkersLayer.clearLayers();
                 }
-                document.getElementById('route-info').style.display = 'none';
+                const routeInfo = document.getElementById('route-info');
+                if (routeInfo) {
+                    routeInfo.style.display = 'none';
+                }
             }
         }
 
@@ -894,7 +905,7 @@
             if (!orders.length) {
                 ordersTableBody.innerHTML = `
                     <tr>
-                        <td colspan="10" style="text-align:center; padding:24px; color: var(--text-gray);">
+                        <td colspan="12" style="text-align:center; padding:24px; color: var(--text-gray);">
                             Заказы отсутствуют
                         </td>
                     </tr>
@@ -906,9 +917,11 @@
             ordersTableBody.innerHTML = orders.map(order => {
                 const orderId = order.id || `temp-${Math.random().toString(36).slice(2)}`;
                 const orderName = order.order_name || `Заказ #${orderId}`;
-                const address = order.destination_point || order.point_address || 'Адрес не указан';
+                const pointAddress = order.point_address || '—';
+                const address = order.address || order.destination_point || 'Адрес не указан';
                 const visitDate = order.visit_date || '—';
                 const visitTime = order.visit_time || '—';
+                const timeAtPoint = order.time_at_point ? `${order.time_at_point} мин` : '—';
                 const courierName = order.courier_name || 'Курьер не назначен';
                 const company = order.company || '—';
                 const recipient = order.recipient_name || '—';
@@ -919,9 +932,11 @@
                     <tr data-order-row>
                         <td><input type="radio" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
                         <td><strong>${orderName}</strong></td>
+                        <td>${pointAddress}</td>
                         <td>${address}</td>
                         <td>${visitDate}</td>
                         <td>${visitTime}</td>
+                        <td>${timeAtPoint}</td>
                         <td>${statusBadge}</td>
                         <td>${courierName}</td>
                         <td>${company}</td>

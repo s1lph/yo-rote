@@ -989,10 +989,19 @@ def api_routes():
         if not courier:
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
         
+        # Генерируем название маршрута
+        user_id = session.get('user_id')
+        if user_id:
+            routes_count = Route.query.filter_by(user_id=user_id).count()
+        else:
+            routes_count = Route.query.count()
+        route_name = data.get('name') or f'Маршрут #{routes_count + 1}'
+        
         # Создание маршрута с привязкой к текущему пользователю
         route = Route(
-            user_id=session.get('user_id'),
+            user_id=user_id,
             courier_id=data['courier_id'],
+            name=route_name,
             date=data['date'],
             status=data.get('status', 'active')
         )
@@ -1008,7 +1017,7 @@ def api_routes():
                     order.route_id = route.id
             db.session.commit()
         
-        return jsonify({'success': True, 'id': route.id, 'message': 'Маршрут создан'})
+        return jsonify({'success': True, 'id': route.id, 'name': route_name, 'message': 'Маршрут создан'})
 
 @app.route('/api/routes/<int:route_id>', methods=['GET', 'PUT', 'DELETE'])
 def api_route(route_id):
@@ -1087,99 +1096,151 @@ def api_route(route_id):
 @app.route('/api/routes/optimize', methods=['POST'])
 def api_routes_optimize():
     """
-    POST /api/routes/optimize - Запуск скрипта оптимизации маршрутов
-    
-    Тело запроса:
-    {
-        "date": "YYYY-MM-DD",
-        "orders": [number, ...],      # массив ID заказов для оптимизации
-        "couriers": [number, ...],    # массив ID курьеров
-        "strategy": "string"          # (опционально) стратегия оптимизации
-    }
-    
-    Возвращает:
-    {
-        "success": true,
-        "message": "Оптимизация запущена",
-        "task_id": "string",
-        "estimated_time": "string",
-        "preview_route_id": number    # ID маршрута, который можно открыть на карте
-    }
+    POST /api/routes/optimize - Группировка и расчет маршрутов (VRP)
+    Заказы группируются по точкам отправки (point_id)
     """
     data = request.json
     
-    # Валидация входных данных
-    if not data.get('date'):
+    # 1. Получаем параметры
+    date = data.get('date')
+    if not date:
         return jsonify({'success': False, 'message': 'Не указана дата'}), 400
     
-    date = data['date']
-    courier_id = data.get('courier_id')
     user_id = session.get('user_id')
     
-    # Если курьер не указан, берем первого доступного курьера текущего пользователя
-    if not courier_id:
-        if user_id:
-            courier = Courier.query.filter_by(user_id=user_id).first()
-        else:
-            courier = Courier.query.first()  # Для неавторизованных - любой курьер
-        if not courier:
-            return jsonify({'success': False, 'message': 'Нет доступных курьеров'}), 400
-        courier_id = courier.id
+    # 2. Собираем данные из БД - курьеры
+    if user_id:
+        couriers = Courier.query.filter_by(user_id=user_id).all()
     else:
-        courier = Courier.query.get(courier_id)
-        if not courier:
-            return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+        couriers = Courier.query.all()
     
-    # Выборка нераспределенных заказов на дату для текущего пользователя
+    if not couriers:
+        return jsonify({'success': False, 'message': 'Нет доступных курьеров. Добавьте курьеров в разделе "Курьеры".'}), 400
+
+    # 3. Берем все нераспределенные заказы на эту дату
     orders_query = Order.query.filter_by(
         visit_date=date,
-        route_id=None,
-        status='planned'
+        status='planned',
+        route_id=None
     )
     if user_id:
         orders_query = orders_query.filter_by(user_id=user_id)
-    # Для неавторизованных - все заказы без фильтрации по user_id
     orders = orders_query.all()
     
     if not orders:
-        return jsonify({
-            'success': False,
-            'message': 'Нет нераспределенных заказов на указанную дату'
-        }), 400
+        return jsonify({'success': False, 'message': 'Нет свободных заказов на эту дату'}), 400
+
+    # 4. Группируем заказы по point_id (точкам отправки)
+    orders_by_point = {}
+    default_point = None
     
-    # Вызов оптимизатора
-    geometry, sorted_orders = optimizer.build_route(orders, courier)
+    # Получаем дефолтную точку отправки
+    if user_id:
+        default_point = Point.query.filter_by(user_id=user_id, is_primary=True).first()
+        if not default_point:
+            default_point = Point.query.filter_by(user_id=user_id).first()
+    else:
+        default_point = Point.query.filter_by(is_primary=True).first()
+        if not default_point:
+            default_point = Point.query.first()
     
-    if not geometry or not sorted_orders:
-        return jsonify({
-            'success': False,
-            'message': 'Не удалось построить маршрут. Проверьте настройки ORS API.'
-        }), 500
+    for order in orders:
+        # Определяем точку отправки для заказа
+        if order.point_id:
+            point = Point.query.get(order.point_id)
+            if point and point.latitude and point.longitude:
+                point_key = order.point_id
+            else:
+                point_key = 'default'
+        else:
+            point_key = 'default'
+        
+        if point_key not in orders_by_point:
+            orders_by_point[point_key] = []
+        orders_by_point[point_key].append(order)
     
-    # Создание маршрута в БД с привязкой к текущему пользователю
-    route = Route(
-        user_id=user_id,
-        courier_id=courier.id,
-        date=date,
-        status='active',
-        geometry=geometry
-    )
+    # 5. Для каждой группы запускаем VRP
+    created_routes_ids = []
+    errors = []
+    used_courier_ids = set()  # Отслеживаем уже использованных курьеров
     
-    db.session.add(route)
+    for point_key, group_orders in orders_by_point.items():
+        # Определяем депо для этой группы
+        if point_key == 'default':
+            if not default_point or not default_point.latitude or not default_point.longitude:
+                errors.append(f'Нет точки отправки для {len(group_orders)} заказов без указанной точки')
+                continue
+            depot_coords = {'lat': default_point.latitude, 'lon': default_point.longitude}
+            depot_id = default_point.id
+        else:
+            point = Point.query.get(point_key)
+            depot_coords = {'lat': point.latitude, 'lon': point.longitude}
+            depot_id = point.id
+        
+        # Фильтруем курьеров - исключаем уже использованных
+        available_couriers = [c for c in couriers if c.id not in used_courier_ids]
+        
+        if not available_couriers:
+            errors.append(f'Нет свободных курьеров для точки {point_key} ({len(group_orders)} заказов)')
+            continue
+        
+        # Запускаем VRP для этой группы
+        try:
+            routes_data = optimizer.solve_vrp(group_orders, available_couriers, depot_coords)
+        except Exception as e:
+            print(f"Ошибка VRP для точки {point_key}: {e}")
+            errors.append(f'Ошибка оптимизации для точки {point_key}')
+            continue
+        
+        if not routes_data:
+            errors.append(f'Не удалось построить маршрут для {len(group_orders)} заказов')
+            continue
+        
+        # Сохраняем результаты в БД
+        for route_info in routes_data:
+            # Отмечаем курьера как использованного
+            used_courier_ids.add(route_info['courier_id'])
+            
+            # Генерируем название маршрута
+            if user_id:
+                routes_count = Route.query.filter_by(user_id=user_id).count()
+            else:
+                routes_count = Route.query.count()
+            route_name = f'Маршрут #{routes_count + 1 + len(created_routes_ids)}'
+            
+            new_route = Route(
+                user_id=user_id,
+                courier_id=route_info['courier_id'],
+                name=route_name,
+                date=date,
+                status='active',
+                geometry=route_info['geometry']
+            )
+            db.session.add(new_route)
+            db.session.flush()
+            
+            created_routes_ids.append(new_route.id)
+            
+            # Привязываем заказы к маршруту
+            for order_id in route_info['order_ids']:
+                order = Order.query.get(order_id)
+                if order:
+                    order.route_id = new_route.id
+                    order.status = 'planned'
+    
     db.session.commit()
     
-    # Привязка заказов к маршруту в оптимальном порядке
-    for order in sorted_orders:
-        order.route_id = route.id
+    if not created_routes_ids and errors:
+        return jsonify({'success': False, 'message': '; '.join(errors)}), 400
     
-    db.session.commit()
+    message = f'Сформировано маршрутов: {len(created_routes_ids)}'
+    if errors:
+        message += f' (Предупреждения: {"; ".join(errors)})'
     
     return jsonify({
         'success': True,
-        'message': 'Маршрут оптимизирован',
-        'route_id': route.id,
-        'orders_count': len(sorted_orders),
-        'preview_route_id': route.id
+        'message': message,
+        'routes_ids': created_routes_ids
     })
 
 @app.route('/api/routes/<int:route_id>/edit', methods=['POST'])
@@ -1201,8 +1262,32 @@ def api_route_edit(route_id):
     }
     """
     data = request.json
-    # TODO: Сохранить изменения порядка заказов, зафиксировать комментарий
-    return jsonify({'success': True, 'message': 'Маршрут обновлен вручную', 'route_id': route_id})
+    
+    route = Route.query.get(route_id)
+    if not route:
+        return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
+    
+    # Получаем новый порядок заказов
+    new_order_ids = data.get('orders', [])
+    
+    if not new_order_ids:
+        return jsonify({'success': False, 'message': 'Не указан порядок заказов'}), 400
+    
+    # Открепляем все текущие заказы от маршрута и сбрасываем позицию
+    for order in route.orders:
+        order.route_id = None
+        order.route_position = None
+    
+    # Привязываем заказы в новом порядке с указанием позиции
+    for position, order_id in enumerate(new_order_ids):
+        order = Order.query.get(order_id)
+        if order:
+            order.route_id = route_id
+            order.route_position = position
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Порядок заказов обновлён', 'route_id': route_id})
 
 @app.route('/api/routes/<int:route_id>/optimize-view', methods=['GET'])
 def api_route_optimize_view(route_id):
@@ -1238,9 +1323,35 @@ def api_route_optimize_view(route_id):
     if not route:
         return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
     
-    # Подготовка данных для визуализации
+    # Определяем точку отправки (Депо) для этого маршрута
+    # Берем point_id из первого заказа в маршруте
+    depot_lat = None
+    depot_lon = None
+    depot_address = None
+    
+    if route.orders:
+        first_order = route.orders[0]
+        if first_order.point_id:
+            depot = Point.query.get(first_order.point_id)
+            if depot and depot.latitude and depot.longitude:
+                depot_lat = depot.latitude
+                depot_lon = depot.longitude
+                depot_address = depot.address
+    
+    # Fallback на основную точку пользователя
+    if not depot_lat and route.user_id:
+        depot = Point.query.filter_by(user_id=route.user_id, is_primary=True).first()
+        if not depot:
+            depot = Point.query.filter_by(user_id=route.user_id).first()
+        if depot and depot.latitude and depot.longitude:
+            depot_lat = depot.latitude
+            depot_lon = depot.longitude
+            depot_address = depot.address
+    
+    # Подготовка данных для визуализации (сортируем по позиции в маршруте)
     orders_data = []
-    for order in route.orders:
+    sorted_orders = sorted(route.orders, key=lambda o: (o.route_position is None, o.route_position or 0))
+    for order in sorted_orders:
         if order.lat and order.lon:
             orders_data.append({
                 'order_id': order.id,
@@ -1265,8 +1376,13 @@ def api_route_optimize_view(route_id):
         'courier': {
             'id': route.courier.id,
             'full_name': route.courier.full_name,
-            'start_lat': route.courier.start_lat,
-            'start_lon': route.courier.start_lon
+            'start_lat': depot_lat,
+            'start_lon': depot_lon
+        },
+        'depot': {
+            'lat': depot_lat,
+            'lon': depot_lon,
+            'address': depot_address
         },
         'orders': orders_data,
         'path': path,
@@ -1523,6 +1639,16 @@ def api_points():
         address = data.get('address')
         if not address:
             return jsonify({'success': False, 'message': 'Адрес обязателен'}), 400
+        
+        # Получаем координаты из запроса или геокодируем адрес
+        latitude = data.get('latitude') or data.get('lat')
+        longitude = data.get('longitude') or data.get('lon')
+        
+        if not latitude or not longitude:
+            # Геокодируем адрес для получения координат
+            coords = optimizer.geocode_address(address)
+            if coords:
+                longitude, latitude = coords  # geocode_address возвращает (lon, lat)
             
         # Если make_primary=true, снимаем флаг с других точек этого пользователя
         user_id = session.get('user_id')
@@ -1534,8 +1660,8 @@ def api_points():
             user_id=user_id,
             address=address,
             is_primary=make_primary,
-            latitude=data.get('latitude') or data.get('lat'),
-            longitude=data.get('longitude') or data.get('lon')
+            latitude=latitude,
+            longitude=longitude
         )
         
         db.session.add(point)
@@ -1588,8 +1714,14 @@ def api_point(point_id):
             
         data = request.json
         
+        # Если адрес изменился, обновляем и координаты
         if 'address' in data:
             point.address = data['address']
+            # Если новые координаты не переданы, геокодируем новый адрес
+            if 'latitude' not in data and 'longitude' not in data:
+                coords = optimizer.geocode_address(data['address'])
+                if coords:
+                    point.longitude, point.latitude = coords
             
         if 'make_primary' in data:
             make_primary = data['make_primary']

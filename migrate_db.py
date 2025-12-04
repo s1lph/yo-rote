@@ -38,6 +38,12 @@ def migrate():
     else:
         print("  ✓ point_id already exists")
     
+    if 'route_position' not in order_columns:
+        print("  ➕ Adding route_position column to orders")
+        cursor.execute("ALTER TABLE orders ADD COLUMN route_position INTEGER")
+    else:
+        print("  ✓ route_position already exists")
+    
     # Check and add columns to couriers table
     print("👤 Checking couriers table...")
     cursor.execute("PRAGMA table_info(couriers)")
@@ -48,6 +54,17 @@ def migrate():
         cursor.execute("ALTER TABLE couriers ADD COLUMN vehicle_type VARCHAR(50) DEFAULT 'car'")
     else:
         print("  ✓ vehicle_type already exists")
+    
+    # Check and add columns to routes table
+    print("🛣️ Checking routes table...")
+    cursor.execute("PRAGMA table_info(routes)")
+    route_columns = [col[1] for col in cursor.fetchall()]
+    
+    if 'name' not in route_columns:
+        print("  ➕ Adding name column to routes")
+        cursor.execute("ALTER TABLE routes ADD COLUMN name VARCHAR(100)")
+    else:
+        print("  ✓ name already exists")
     
     conn.commit()
     conn.close()

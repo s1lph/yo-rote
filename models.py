@@ -87,6 +87,26 @@ class Courier(db.Model):
     
     def to_dict(self):
         """Сериализация в словарь для JSON"""
+        # Находим текущий активный заказ курьера
+        current_order = None
+        
+        # Проверяем заказы в активных маршрутах курьера
+        for route in self.routes:
+            if route.status == 'active':
+                for order in route.orders:
+                    if order.status == 'in_progress':
+                        current_order = order.order_name
+                        break
+                if current_order:
+                    break
+        
+        # Если нет активного, показываем первый заказ в активном маршруте
+        if not current_order:
+            for route in self.routes:
+                if route.status == 'active' and route.orders:
+                    current_order = f"{route.orders[0].order_name} (ожидает)"
+                    break
+        
         return {
             'id': self.id,
             'full_name': self.full_name,
@@ -97,6 +117,7 @@ class Courier(db.Model):
             'capacity': self.capacity,
             'start_lat': self.start_lat,
             'start_lon': self.start_lon,
+            'current_order': current_order,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
@@ -142,6 +163,9 @@ class Order(db.Model):
     # Привязка к маршруту
     route_id = db.Column(db.Integer, db.ForeignKey('routes.id'), nullable=True)
     
+    # Позиция заказа в маршруте (для сохранения порядка)
+    route_position = db.Column(db.Integer, nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -158,6 +182,13 @@ class Order(db.Model):
                 courier_name = courier.full_name
         elif self.route_id and self.route and self.route.courier:
             courier_name = self.route.courier.full_name
+        
+        # Получаем адрес точки отправки
+        point_address = None
+        if self.point_id:
+            point = Point.query.get(self.point_id)
+            if point:
+                point_address = point.address
         
         return {
             'id': self.id,
@@ -176,6 +207,7 @@ class Order(db.Model):
             'status': self.status,
             'courier_id': self.courier_id,
             'point_id': self.point_id,
+            'point_address': point_address,
             'route_id': self.route_id,
             'courier_name': courier_name,
             'created_at': self.created_at.isoformat() if self.created_at else None
@@ -189,6 +221,9 @@ class Route(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     courier_id = db.Column(db.Integer, db.ForeignKey('couriers.id'), nullable=False)
+    
+    # Название маршрута (автогенерируется)
+    name = db.Column(db.String(100))
     
     date = db.Column(db.String(20), nullable=False)
     
@@ -230,8 +265,10 @@ class Route(db.Model):
         
         return {
             'id': self.id,
+            'name': self.name or f'Маршрут #{self.id}',
             'courier_id': self.courier_id,
             'courier_name': self.courier.full_name if self.courier else None,
+            'vehicle_type': self.courier.vehicle_type if self.courier else 'car',
             'date': self.date,
             'status': self.status,
             'current_order': current_order,
