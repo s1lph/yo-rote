@@ -58,7 +58,7 @@ python app.py
 
 ### Маршруты
 - `GET /api/routes` - список маршрутов (фильтры: date, courier_id, status)
-- **`POST /api/routes/optimize`** - оптимизация маршрута через VRP алгоритм
+- **`POST /api/routes/optimize`** - оптимизация маршрута через VRP(Сlassic logistics challenge in optimization, finding the most efficient routes for a fleet of vehicles to serve multiple locations, minimizing costs like fuel, time, and distance while meeting customer demands and vehicle limits) алгоритм
 - **`GET /api/routes/<id>/optimize-view`** - данные для визуализации на карте
 - `DELETE /api/routes/<id>` - удаление маршрута
 
