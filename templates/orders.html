@@ -52,6 +52,233 @@
         height: 400px;
         border-radius: 12px;
     }
+
+    /* Import Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .modal-content {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+        transform: translateY(20px);
+        transition: transform 0.3s ease;
+    }
+
+    .modal-overlay.active .modal-content {
+        transform: translateY(0);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .modal-header h2 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .modal-close-btn {
+        background: transparent;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-gray);
+        padding: 4px;
+        transition: color 0.2s;
+    }
+
+    .modal-close-btn:hover {
+        color: var(--text-primary);
+    }
+
+    .instruction-steps {
+        margin-bottom: 24px;
+    }
+
+    .instruction-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .instruction-step:last-child {
+        border-bottom: none;
+    }
+
+    .step-number {
+        width: 28px;
+        height: 28px;
+        background: var(--primary-blue);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .step-content h4 {
+        margin: 0 0 4px 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .step-content p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-gray);
+    }
+
+    .example-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 24px;
+        font-size: 12px;
+    }
+
+    .example-table th,
+    .example-table td {
+        padding: 8px 10px;
+        border: 1px solid var(--border-color);
+        text-align: left;
+    }
+
+    .example-table th {
+        background: var(--bg-secondary);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .example-table td {
+        color: var(--text-gray);
+    }
+
+    .upload-area {
+        border: 2px dashed var(--border-color);
+        border-radius: 12px;
+        padding: 40px 24px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: var(--bg-secondary);
+    }
+
+    .upload-area:hover,
+    .upload-area.drag-over {
+        border-color: var(--primary-blue);
+        background: rgba(14, 165, 233, 0.05);
+    }
+
+    .upload-area.drag-over {
+        transform: scale(1.02);
+    }
+
+    .upload-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.6;
+    }
+
+    .upload-area h3 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .upload-area p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-gray);
+    }
+
+    .upload-area input[type="file"] {
+        display: none;
+    }
+
+    .upload-btn {
+        margin-top: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .upload-btn.loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .upload-btn .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid transparent;
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .selected-file {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(14, 165, 233, 0.1);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .selected-file i {
+        color: var(--primary-blue);
+    }
+
+    .selected-file span {
+        font-size: 13px;
+        font-weight: 500;
+    }
 </style>
 {% endblock %}
 
@@ -216,6 +443,105 @@
         <button class="btn btn-secondary" id="edit-order-btn">
             <i class="fi fi-sr-edit"></i> Изменить
         </button>
+    </div>
+</div>
+
+<!-- Модальное окно импорта Excel -->
+<div id="import-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fi fi-sr-file-excel" style="color: var(--primary-blue); margin-right: 8px;"></i>Импорт заказов
+                из Excel</h2>
+            <button class="modal-close-btn" id="close-import-modal">&times;</button>
+        </div>
+
+        <div class="instruction-steps">
+            <div class="instruction-step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h4>Подготовьте Excel файл</h4>
+                    <p>Создайте файл .xlsx с заказами, используя структуру из примера ниже</p>
+                </div>
+            </div>
+            <div class="instruction-step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h4>Заполните обязательные колонки</h4>
+                    <p>Убедитесь, что все поля заполнены корректно</p>
+                </div>
+            </div>
+            <div class="instruction-step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h4>Загрузите файл</h4>
+                    <p>Перетащите файл в область загрузки или выберите его вручную</p>
+                </div>
+            </div>
+        </div>
+
+        <h4 style="margin: 0 0 12px 0; font-size: 14px;">Пример структуры файла:</h4>
+        <table class="example-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Адрес</th>
+                    <th>Дата</th>
+                    <th>Время</th>
+                    <th>Имя клиента</th>
+                    <th>Телефон</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Заказ #001</td>
+                    <td>ул. Ленина, 15</td>
+                    <td>2024-12-10</td>
+                    <td>10:00</td>
+                    <td>Иванов Иван</td>
+                    <td>+7 999 123-45-67</td>
+                </tr>
+                <tr>
+                    <td>Заказ #002</td>
+                    <td>пр. Мира, 42</td>
+                    <td>2024-12-10</td>
+                    <td>14:30</td>
+                    <td>Петрова Мария</td>
+                    <td>+7 999 765-43-21</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <form id="import-form" enctype="multipart/form-data">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label" for="import-point-id"
+                    style="font-size: 14px; font-weight: 600; margin-bottom: 8px; display: block;">
+                    <i class="fi fi-sr-marker" style="margin-right: 6px; color: var(--primary-blue);"></i>
+                    Откуда забирать заказы? (Точка отправления)
+                </label>
+                <select id="import-point-id" name="point_id" class="form-select" required style="width: 100%;">
+                    <option value="">Загрузка точек...</option>
+                </select>
+                <small style="display: block; margin-top: 6px; color: var(--text-gray); font-size: 12px;">
+                    Все импортированные заказы будут привязаны к этой точке
+                </small>
+            </div>
+
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📁</div>
+                <h3>Перетащите Excel файл сюда</h3>
+                <p>или нажмите для выбора файла</p>
+                <input type="file" id="excel-file-input" name="file" accept=".xlsx,.xls">
+                <div id="selected-file-info" class="selected-file" style="display: none;">
+                    <i class="fi fi-sr-document"></i>
+                    <span id="selected-file-name"></span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary upload-btn" id="upload-btn"
+                style="width: 100%; margin-top: 16px;" disabled>
+                <i class="fi fi-sr-cloud-upload"></i>
+                <span>Загрузить и импортировать</span>
+            </button>
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -631,7 +957,10 @@
             // Создаем modal
             const modal = document.createElement('div');
             modal.style.cssText = `
-                background: var(--bg-primary);
+                background: rgba(255, 255, 255, 0.75);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.3);
                 border-radius: 16px;
                 padding: 24px;
                 max-width: 400px;
@@ -900,21 +1229,18 @@
 
         updateSelectedPanel();
 
-        function updateOrdersTable(orders = []) {
-            if (!ordersTableBody) return;
+        // Функция генерации HTML для таблицы заказов (без вставки в DOM)
+        function generateOrdersHtml(orders = []) {
             if (!orders.length) {
-                ordersTableBody.innerHTML = `
+                return `
                     <tr>
                         <td colspan="12" style="text-align:center; padding:24px; color: var(--text-gray);">
                             Заказы отсутствуют
                         </td>
                     </tr>
                 `;
-                updateRadioButtons();
-                updateSelectedPanel();
-                return;
             }
-            ordersTableBody.innerHTML = orders.map(order => {
+            return orders.map(order => {
                 const orderId = order.id || `temp-${Math.random().toString(36).slice(2)}`;
                 const orderName = order.order_name || `Заказ #${orderId}`;
                 const pointAddress = order.point_address || '—';
@@ -945,7 +1271,11 @@
                     </tr>
                 `;
             }).join('');
+        }
 
+        function updateOrdersTable(orders = []) {
+            if (!ordersTableBody) return;
+            ordersTableBody.innerHTML = generateOrdersHtml(orders);
             updateRadioButtons();
             updateSelectedPanel();
         }
@@ -960,21 +1290,332 @@
             return `<span class="status-badge ${className}">${text}</span>`;
         }
 
+        // === SILENT POLLING (Тихое обновление) ===
+
+        // === SMART POLLING (Точечное обновление) ===
+
+        async function refreshOrdersSmart() {
+            try {
+                const response = await api.get('/api/orders');
+                const newOrders = response.orders || [];
+
+                // 1. Создаем Map существующих строк для быстрого поиска
+                const existingRows = new Map();
+                document.querySelectorAll('#orders-table-body tr[data-order-row]').forEach(row => {
+                    const idInput = row.querySelector('input[name="selected_order"]');
+                    if (idInput) {
+                        existingRows.set(idInput.value, row);
+                    }
+                });
+
+                // Set для отслеживания обработанных ID (чтобы потом удалить лишние)
+                const processedIds = new Set();
+
+                // 2. Итерируем по новым данным
+                newOrders.forEach(order => {
+                    const orderId = order.id; // Предполагаем, что ID всегда есть и стабилен
+                    if (!orderId) return; // Пропуск если нет ID
+
+                    processedIds.add(orderId.toString());
+
+                    const orderName = order.order_name || `Заказ #${orderId}`;
+                    const pointAddress = order.point_address || '—';
+                    const address = order.address || order.destination_point || 'Адрес не указан';
+                    const visitDate = order.visit_date || '—';
+                    const visitTime = order.visit_time || '—';
+                    const timeAtPoint = order.time_at_point ? `${order.time_at_point} мин` : '—';
+                    const courierName = order.courier_name || 'Курьер не назначен';
+                    const company = order.company || '—';
+                    const recipient = order.recipient_name || '—';
+                    const recipientPhone = order.recipient_phone || '—';
+                    const statusBadge = getStatusBadge(order.status);
+
+                    // Данные для ячеек (по порядку столбцов)
+                    // Index 0 - Radio button (не трогаем при обновлении)
+                    const cellData = [
+                        null, // Radio (skip)
+                        `<strong>${orderName}</strong>`,
+                        pointAddress,
+                        address,
+                        visitDate,
+                        visitTime,
+                        timeAtPoint,
+                        statusBadge,
+                        courierName,
+                        company,
+                        recipient,
+                        recipientPhone
+                    ];
+
+                    let row = existingRows.get(orderId.toString());
+
+                    if (row) {
+                        // === UPDATE EXISTING ROW ===
+                        const cells = row.cells;
+
+                        // Итерируем по ячейкам, начиная с 1 (пропускаем чекбокс)
+                        for (let i = 1; i < cells.length; i++) {
+                            const newData = cellData[i];
+                            // Если контент отличается - обновляем
+                            // Используем trim() для надежности сравнения
+                            if (cells[i].innerHTML.trim() !== newData.trim()) {
+                                cells[i].innerHTML = newData;
+                            }
+                        }
+                    } else {
+                        // === CREATE NEW ROW ===
+                        row = document.createElement('tr');
+                        row.setAttribute('data-order-row', '');
+
+                        row.innerHTML = `
+                            <td><input type="radio" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
+                            <td>${cellData[1]}</td>
+                            <td>${cellData[2]}</td>
+                            <td>${cellData[3]}</td>
+                            <td>${cellData[4]}</td>
+                            <td>${cellData[5]}</td>
+                            <td>${cellData[6]}</td>
+                            <td>${cellData[7]}</td>
+                            <td>${cellData[8]}</td>
+                            <td>${cellData[9]}</td>
+                            <td>${cellData[10]}</td>
+                            <td>${cellData[11]}</td>
+                        `;
+
+                        ordersTableBody.appendChild(row);
+
+                        // Нужно навесить слушатели на новый input
+                        updateRadioButtons(); // Это переназначит всем, можно оптимизировать, но пока ок
+                    }
+                });
+
+                // 3. Удаляем строки, которых нет в новых данных
+                existingRows.forEach((row, id) => {
+                    if (!processedIds.has(id)) {
+                        row.remove();
+                    }
+                });
+
+                // Если таблица пустая
+                if (newOrders.length === 0 && ordersTableBody.children.length === 0) {
+                    ordersTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="12" style="text-align:center; padding:24px; color: var(--text-gray);">
+                                Заказы отсутствуют
+                            </td>
+                        </tr>
+                    `;
+                } else if (newOrders.length > 0 && ordersTableBody.querySelector('td[colspan="12"]')) {
+                    // Удаляем заглушку "нет заказов" если появились заказы
+                    ordersTableBody.querySelector('td[colspan="12"]').parentNode.remove();
+                }
+
+                // Обновляем панель выделения (вдруг удалили выбранный элемент)
+                updateSelectedPanel();
+
+            } catch (error) {
+                console.error('Error in smart refresh:', error);
+            }
+        }
+
         // === ИНИЦИАЛИЗАЦИЯ ===
 
         // Обновление предпросмотра при выборе точки отправления
         pointSelect.addEventListener('change', updateRoutePreview);
 
-        // Загрузка данных
+        // Начальная загрузка данных
         try {
             const response = await api.get('/api/orders');
             updateOrdersTable(response.orders || []);
         } catch (error) {
             console.error('Error loading orders:', error);
-            updateOrdersTable([]);
         }
 
+        // Тихое автообновление (Smart Polling) каждые 3 секунды
+        setInterval(refreshOrdersSmart, 3000);
+
         await Promise.all([loadCouriers(), loadPoints()]);
+
+        // ============================================
+        // IMPORT MODAL LOGIC
+        // ============================================
+
+        const importExcelBtn = document.getElementById('import-excel-btn');
+        const importModal = document.getElementById('import-modal');
+        const closeImportModal = document.getElementById('close-import-modal');
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('excel-file-input');
+        const importForm = document.getElementById('import-form');
+        const uploadBtn = document.getElementById('upload-btn');
+        const selectedFileInfo = document.getElementById('selected-file-info');
+        const selectedFileName = document.getElementById('selected-file-name');
+        const importPointSelect = document.getElementById('import-point-id');
+
+        // Загрузка точек для импорта
+        async function loadPointsForImport() {
+            if (!importPointSelect) return;
+            try {
+                const res = await api.get('/api/points');
+                if (res.points && res.points.length > 0) {
+                    importPointSelect.innerHTML = '<option value="">Выберите точку отправления</option>' +
+                        res.points.map(p => {
+                            const prefix = p.is_primary ? '★ ' : '';
+                            return `<option value="${p.id}">${prefix}${p.address}</option>`;
+                        }).join('');
+                    importPointSelect.disabled = false;
+                } else {
+                    importPointSelect.innerHTML = '<option value="">Нет точек. Создайте их сначала.</option>';
+                    importPointSelect.disabled = true;
+                }
+            } catch (e) {
+                console.error('Error loading points for import:', e);
+                importPointSelect.innerHTML = '<option value="">Ошибка загрузки точек</option>';
+            }
+        }
+
+        // Открытие модального окна
+        importExcelBtn?.addEventListener('click', () => {
+            importModal.classList.add('active');
+            loadPointsForImport(); // Загружаем список точек
+        });
+
+        // Закрытие модального окна
+        function closeModal() {
+            importModal.classList.remove('active');
+            resetImportForm();
+        }
+
+        closeImportModal?.addEventListener('click', closeModal);
+
+        importModal?.addEventListener('click', (e) => {
+            if (e.target === importModal) {
+                closeModal();
+            }
+        });
+
+        // Закрытие по Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && importModal?.classList.contains('active')) {
+                closeModal();
+            }
+        });
+
+        // Сброс формы
+        function resetImportForm() {
+            if (importForm) importForm.reset();
+            if (selectedFileInfo) selectedFileInfo.style.display = 'none';
+            if (uploadBtn) {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fi fi-sr-cloud-upload"></i><span>Загрузить и импортировать</span>';
+                uploadBtn.classList.remove('loading');
+            }
+        }
+
+        // Клик по области загрузки
+        uploadArea?.addEventListener('click', () => {
+            fileInput?.click();
+        });
+
+        // Drag and Drop
+        uploadArea?.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea?.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea?.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+
+            const files = e.dataTransfer?.files;
+            if (files?.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    handleFileSelect(file);
+                    // Устанавливаем файл в input
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    fileInput.files = dataTransfer.files;
+                } else {
+                    showNotification('Поддерживаются только Excel файлы (.xlsx, .xls)', 'error');
+                }
+            }
+        });
+
+        // Выбор файла через input
+        fileInput?.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                handleFileSelect(file);
+            }
+        });
+
+        // Обработка выбранного файла
+        function handleFileSelect(file) {
+            selectedFileName.textContent = file.name;
+            selectedFileInfo.style.display = 'flex';
+            uploadBtn.disabled = false;
+        }
+
+        // Отправка формы
+        importForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const file = fileInput?.files?.[0];
+            if (!file) {
+                showNotification('Выберите файл для загрузки', 'error');
+                return;
+            }
+
+            // Проверка выбора точки
+            const selectedPointId = importPointSelect?.value;
+            if (!selectedPointId) {
+                showNotification('Выберите точку отправления', 'error');
+                return;
+            }
+
+            // Показываем спиннер
+            uploadBtn.innerHTML = '<div class="spinner"></div><span>Загрузка...</span>';
+            uploadBtn.classList.add('loading');
+            uploadBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('point_id', selectedPointId);
+
+                const response = await fetch('/api/orders/import', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(result.message, 'success');
+                    closeModal();
+                    // Перезагружаем страницу для отображения новых заказов
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showNotification(result.message || 'Ошибка при импорте', 'error');
+                    uploadBtn.innerHTML = '<i class="fi fi-sr-cloud-upload"></i><span>Загрузить и импортировать</span>';
+                    uploadBtn.classList.remove('loading');
+                    uploadBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                showNotification('Ошибка соединения с сервером', 'error');
+                uploadBtn.innerHTML = '<i class="fi fi-sr-cloud-upload"></i><span>Загрузить и импортировать</span>';
+                uploadBtn.classList.remove('loading');
+                uploadBtn.disabled = false;
+            }
+        });
     });
 </script>
 {% endblock %}

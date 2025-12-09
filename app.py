@@ -1,102 +1,10 @@
-"""
-yo.route - API Endpoints для Backend интеграции
-
-Все endpoints готовы для интеграции с backend базой данных.
-В каждом endpoint есть TODO комментарии с описанием необходимых операций с БД.
-
-Структура базы данных (рекомендуемая):
-
-Таблицы:
-1. users - Пользователи/компании
-   - id (PK)
-   - email (unique)
-   - password_hash
-   - company_name
-   - activity
-   - phone
-   - created_at
-   - updated_at
-
-2. points - Точки отправки
-   - id (PK)
-   - user_id (FK -> users.id)
-   - address
-   - is_primary (boolean)
-   - latitude (optional)
-   - longitude (optional)
-   - created_at
-   - updated_at
-
-3. couriers - Курьеры
-   - id (PK)
-   - user_id (FK -> users.id)
-   - full_name
-   - phone (unique)
-   - telegram
-   - vehicle_type (enum: car, truck, bicycle, scooter)
-   - auth_key
-   - created_at
-   - updated_at
-
-4. orders - Заказы
-   - id (PK)
-   - user_id (FK -> users.id)
-   - order_name
-   - destination_point
-   - point_address
-   - visit_date
-   - visit_time
-   - time_at_point
-   - recipient_name
-   - recipient_phone
-   - comment
-   - status (enum: planned, in_progress, completed)
-   - company
-   - created_at
-   - updated_at
-
-5. routes - Маршруты
-   - id (PK)
-   - user_id (FK -> users.id)
-   - courier_id (FK -> couriers.id)
-   - date
-   - status (enum: active, completed)
-   - created_at
-   - updated_at
-
-6. route_orders - Связь маршрутов и заказов (many-to-many)
-   - route_id (FK -> routes.id)
-   - order_id (FK -> orders.id)
-
-7. settings - Настройки компании
-   - id (PK)
-   - user_id (FK -> users.id, unique)
-   - company_name
-   - timezone
-   - visit_time
-   - delivery_time
-   - created_at
-   - updated_at
-
-8. sessions - Сессии пользователей (для JWT или сессионных токенов)
-   - id (PK)
-   - user_id (FK -> users.id)
-   - token
-   - expires_at
-   - created_at
-
-Все endpoints возвращают JSON и используют стандартные HTTP методы:
-- GET - получение данных
-- POST - создание новой записи
-- PUT - обновление существующей записи
-- DELETE - удаление записи
-"""
-
 from flask import Flask, render_template, jsonify, request, session
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 from functools import wraps
+import pandas as pd
+
 
 # Загрузка переменных окружения из .env файла
 load_dotenv()
@@ -807,9 +715,114 @@ def api_orders_batch():
             'message': 'Заказы обновлены'
         })
 
+@app.route('/api/orders/import', methods=['POST'])
+def import_orders():
+    """
+    POST /api/orders/import - Импорт заказов из Excel файла
+    
+    Формат файла: .xlsx или .xls
+    Обязательные колонки: Название, Адрес, Дата, Время, Имя клиента, Телефон
+    Требуется: point_id (ID точки отправления) в form data
+    
+    Возвращает:
+    {
+        "success": true,
+        "message": "Импортировано: N",
+        "count": N
+    }
+    """
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'Файл не найден'}), 400
+    
+    # Получаем point_id из формы
+    point_id = request.form.get('point_id')
+    if not point_id:
+        return jsonify({'success': False, 'message': 'Выберите точку отправления'}), 400
+    
+    try:
+        point_id = int(point_id)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Некорректный ID точки отправления'}), 400
+    
+    file = request.files['file']
+    
+    if not file.filename:
+        return jsonify({'success': False, 'message': 'Файл не выбран'}), 400
+    
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        return jsonify({'success': False, 'message': 'Поддерживаются только Excel файлы (.xlsx, .xls)'}), 400
+    
+    try:
+        # Чтение Excel файла
+        df = pd.read_excel(file)
+        
+        # Проверка обязательных колонок
+        required_columns = ['Название', 'Адрес', 'Дата', 'Время', 'Имя клиента', 'Телефон']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            return jsonify({
+                'success': False,
+                'message': f'Отсутствуют обязательные колонки: {", ".join(missing_columns)}'
+            }), 400
+        
+        count = 0
+        user_id = session.get('user_id')
+        
+        for _, row in df.iterrows():
+            addr = str(row['Адрес']).strip()
+            lat, lon = None, None
+            
+            # Попытка геокодирования адреса
+            try:
+                coords = optimizer.geocode_address(addr)
+                if coords:
+                    lon, lat = coords[0], coords[1]
+            except Exception as geo_error:
+                print(f"⚠️  Ошибка геокодинга для адреса '{addr}': {geo_error}")
+            
+            # Обработка даты
+            visit_date = str(row['Дата'])
+            if ' ' in visit_date:
+                visit_date = visit_date.split(' ')[0]
+            
+            # Создание заказа с привязкой к точке, без курьера (для VRP)
+            new_order = Order(
+                user_id=user_id,
+                point_id=point_id,           # Привязываем к выбранному складу
+                courier_id=None,             # Оставляем пустым для авто-распределения VRP
+                order_name=str(row['Название']).strip(),
+                address=addr,
+                destination_point=addr,
+                visit_date=visit_date,
+                visit_time=str(row['Время']).strip(),
+                recipient_name=str(row['Имя клиента']).strip(),
+                recipient_phone=str(row['Телефон']).strip(),
+                lat=lat,
+                lon=lon,
+                status='planned'
+            )
+            
+            db.session.add(new_order)
+            count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Импортировано: {count}',
+            'count': count
+        })
+        
+    except Exception as e:
+        print(f"❌ Ошибка импорта Excel: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Ошибка чтения файла: {str(e)}'}), 500
+
 # ============================================
 # COURIER ASSIGNMENTS API - Привязка заказов к курьерам
 # ============================================
+
 
 @app.route('/api/courier-assignments', methods=['GET', 'POST'])
 def api_courier_assignments():
@@ -1482,7 +1495,17 @@ def api_couriers():
         db.session.add(courier)
         db.session.commit()
         
-        return jsonify({'success': True, 'id': courier.id, 'message': 'Курьер добавлен'})
+        # Генерируем код авторизации для Telegram-бота
+        auth_code = courier.generate_auth_code()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'id': courier.id, 
+            'auth_code': auth_code,
+            'message': 'Курьер добавлен'
+        })
+
 
 @app.route('/api/couriers/<int:courier_id>', methods=['GET', 'PUT', 'DELETE'])
 def api_courier(courier_id):
@@ -1577,6 +1600,129 @@ def api_courier(courier_id):
         db.session.delete(courier)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Курьер удален'})
+
+@app.route('/api/couriers/<int:courier_id>/regenerate-code', methods=['POST'])
+def api_courier_regenerate_code(courier_id):
+    """
+    POST /api/couriers/<id>/regenerate-code - Генерация нового кода авторизации
+    
+    Возвращает:
+    {
+        "success": true,
+        "auth_code": "ABC123",
+        "message": "Код обновлен"
+    }
+    """
+    courier = Courier.query.get(courier_id)
+    if not courier:
+        return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
+    
+    # Сбрасываем привязку Telegram при регенерации кода
+    courier.telegram_chat_id = None
+    auth_code = courier.generate_auth_code(force=True)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'auth_code': auth_code,
+        'message': 'Код обновлен'
+    })
+
+
+@app.route('/api/couriers/locations', methods=['GET'])
+def api_courier_locations():
+    """
+    GET /api/couriers/locations - Получение геолокаций активных курьеров
+    
+    Query параметры (опционально):
+    - route_id: фильтр по конкретному маршруту
+    
+    Возвращает:
+    {
+        "couriers": [
+            {
+                "id": number,
+                "full_name": "string",
+                "vehicle_type": "car|truck|bicycle|scooter",
+                "lat": number,
+                "lon": number,
+                "is_on_shift": boolean,
+                "current_order": "string|null"
+            }
+        ]
+    }
+    """
+    user_id = session.get('user_id')
+    route_id = request.args.get('route_id', None, type=int)
+    
+    # Базовый запрос - только курьеры на смене с координатами
+    if user_id:
+        query = Courier.query.filter_by(user_id=user_id)
+    else:
+        query = Courier.query
+    
+    # Фильтруем только тех, у кого есть координаты
+    query = query.filter(
+        Courier.current_lat.isnot(None),
+        Courier.current_lon.isnot(None),
+        Courier.is_on_shift == True
+    )
+    
+    # Если указан route_id, фильтруем по курьерам с активными маршрутами
+    if route_id:
+        route = Route.query.get(route_id)
+        if route:
+            query = query.filter_by(id=route.courier_id)
+    
+    couriers = query.all()
+    
+    result = []
+    for courier in couriers:
+        # Находим текущий заказ курьера
+        current_order = None
+        for route in courier.routes:
+            if route.status == 'active':
+                for order in route.orders:
+                    if order.status == 'in_progress':
+                        current_order = order.order_name
+                        break
+                    elif order.status == 'planned' and not current_order:
+                        current_order = f"{order.order_name} (ожидает)"
+                if current_order:
+                    break
+        
+        result.append({
+            'id': courier.id,
+            'full_name': courier.full_name,
+            'vehicle_type': courier.vehicle_type,
+            'lat': courier.current_lat,
+            'lon': courier.current_lon,
+            'is_on_shift': courier.is_on_shift,
+            'current_order': current_order
+        })
+    
+    return jsonify({'couriers': result})
+
+
+@app.route('/api/routes/<int:route_id>/send', methods=['POST'])
+def api_route_send(route_id):
+    """
+    POST /api/routes/<id>/send - Отправка маршрута водителю в Telegram
+    
+    Возвращает:
+    {
+        "success": true,
+        "message": "Маршрут отправлен курьеру {Имя}"
+    }
+    """
+    from telegram_utils import send_route_to_driver
+    
+    result = send_route_to_driver(route_id)
+    
+    if result['success']:
+        return jsonify(result)
+    else:
+        return jsonify(result), 400
 
 # ============================================
 # POINTS API - Работа с точками отправки

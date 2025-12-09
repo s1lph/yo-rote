@@ -282,10 +282,27 @@
     .btn-delete {
         flex: 0 0 auto !important;
         width: 40px;
-        padding: 10px !important;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        padding: 0 !important;
         background: rgba(239, 68, 68, 0.1);
         color: #ef4444;
         border: 1px solid rgba(239, 68, 68, 0.2);
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box;
+    }
+
+    .btn-delete i,
+    .btn-delete i::before {
+        display: block;
+        font-size: 16px;
+        line-height: 1;
+        text-align: center;
+        margin: 0;
+        padding: 0;
     }
 
     .btn-delete:hover {
@@ -545,6 +562,50 @@
     @keyframes spin {
         to {
             transform: rotate(360deg);
+        }
+    }
+
+    /* ===== Courier Marker ===== */
+    .courier-marker {
+        position: relative;
+    }
+
+    .courier-marker-inner {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        border: 3px solid white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        position: relative;
+        z-index: 2;
+    }
+
+    .courier-marker-pulse {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(37, 99, 235, 0.3);
+        animation: pulse-ring 2s ease-out infinite;
+        z-index: 1;
+    }
+
+    @keyframes pulse-ring {
+        0% {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        100% {
+            transform: translate(-50%, -50%) scale(2);
+            opacity: 0;
         }
     }
 
@@ -1699,13 +1760,41 @@
             }
         });
 
-        // ===== Send Route to Courier =====
+        // ===== Send Route to Courier via Telegram =====
         async function sendRoute(routeId) {
-            showNotification('Отправка маршрута курьеру...', 'info');
-            // TODO: Implement send route functionality
-            setTimeout(() => {
-                showNotification('Маршрут отправлен курьеру!', 'success');
-            }, 1000);
+            const route = state.routes.find(r => r.id === parseInt(routeId));
+            const courierName = route?.courier_name || 'курьер';
+
+            if (!confirm(`Отправить маршрут в Telegram для "${courierName}"?`)) {
+                return;
+            }
+
+            try {
+                // Находим кнопку и меняем состояние
+                const btn = routesList.querySelector(`[data-action="send"][data-route-id="${routeId}"]`);
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fi fi-rr-spinner fi-spin"></i>';
+                }
+
+                const response = await api.post(`/api/routes/${routeId}/send`);
+
+                if (response.success) {
+                    showNotification(response.message || 'Маршрут отправлен!', 'success');
+                } else {
+                    showNotification(response.message || 'Ошибка отправки маршрута', 'error');
+                }
+            } catch (error) {
+                console.error('Error sending route:', error);
+                showNotification('Ошибка отправки. Проверьте, привязан ли Telegram у курьера.', 'error');
+            } finally {
+                // Восстанавливаем кнопку
+                const btn = routesList.querySelector(`[data-action="send"][data-route-id="${routeId}"]`);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fi fi-rr-paper-plane"></i> Отправить';
+                }
+            }
         }
 
         // ===== Delete Route =====
@@ -1950,9 +2039,164 @@
             }
         }
 
+        // ===== Courier Location Tracking =====
+        let courierMarkersLayer = L.layerGroup().addTo(map);
+        let courierLocationInterval = null;
+
+        // Vehicle icons mapping
+        const vehicleIcons = {
+            'car': '🚗',
+            'truck': '🚚',
+            'bicycle': '🚲',
+            'scooter': '🛵',
+            'walk': '🚶'
+        };
+
+        async function loadCourierLocations() {
+            try {
+                const response = await api.get('/api/couriers/locations');
+                displayCourierMarkers(response.couriers || []);
+            } catch (error) {
+                console.error('Error loading courier locations:', error);
+            }
+        }
+
+        function displayCourierMarkers(couriers) {
+            courierMarkersLayer.clearLayers();
+
+            couriers.forEach(courier => {
+                if (!courier.lat || !courier.lon) return;
+
+                const vehicleIcon = vehicleIcons[courier.vehicle_type] || '🚗';
+                const bgColor = '#2563eb'; // Primary blue
+
+                const courierIcon = L.divIcon({
+                    className: 'courier-marker',
+                    html: `
+                        <div class="courier-marker-pulse"></div>
+                        <div class="courier-marker-inner" style="background: ${bgColor};">
+                            ${vehicleIcon}
+                        </div>
+                    `,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+
+                const popupContent = `
+                    <b>🧑‍💼 ${courier.full_name}</b><br>
+                    ${courier.current_order ? `📦 ${courier.current_order}` : '⏳ Ожидает заказ'}
+                `;
+
+                L.marker([courier.lat, courier.lon], { icon: courierIcon })
+                    .bindPopup(popupContent)
+                    .addTo(courierMarkersLayer);
+            });
+        }
+
+        // Start auto-refresh for courier locations (every 30 seconds)
+        function startCourierTracking() {
+            loadCourierLocations(); // Initial load
+            courierLocationInterval = setInterval(loadCourierLocations, 30000);
+        }
+
+        // Stop auto-refresh when leaving page
+        window.addEventListener('beforeunload', () => {
+            if (courierLocationInterval) {
+                clearInterval(courierLocationInterval);
+            }
+        });
+
+        // ===== SILENT POLLING для маршрутов =====
+        let lastRoutesJson = null; // Для сравнения данных
+        let isMapInteracting = false; // Флаг взаимодействия с картой
+
+        // Отслеживаем взаимодействие с картой
+        map.on('movestart', () => { isMapInteracting = true; });
+        map.on('moveend', () => { isMapInteracting = false; });
+        map.on('zoomstart', () => { isMapInteracting = true; });
+        map.on('zoomend', () => { isMapInteracting = false; });
+
+        async function autoUpdateRoutes() {
+            // Пропускаем обновление если пользователь взаимодействует с картой
+            if (isMapInteracting) {
+                console.log('⏸️ Пропуск обновления: пользователь взаимодействует с картой');
+                return;
+            }
+
+            try {
+                // Загружаем данные
+                const [activeRes, completedRes] = await Promise.all([
+                    api.get(`/api/routes?status=active&date=${dayInput.value}`),
+                    api.get(`/api/routes?status=completed&date=${dayInput.value}`)
+                ]);
+
+                let activeRoutes = (activeRes.routes || []).map(r => ({ ...r, status: 'active' }));
+                let completedRoutes = (completedRes.routes || []).map(r => ({ ...r, status: 'completed' }));
+
+                const newRoutes = [...activeRoutes, ...completedRoutes];
+
+                // Создаём JSON для сравнения (без random данных)
+                const newRoutesJson = JSON.stringify(newRoutes.map(r => ({
+                    id: r.id,
+                    name: r.name,
+                    status: r.status,
+                    courier_name: r.courier_name,
+                    orders_count: r.orders ? r.orders.length : 0
+                })));
+
+                // Сравниваем с предыдущими данными
+                if (lastRoutesJson === newRoutesJson) {
+                    // Данные не изменились - ничего не делаем
+                    return;
+                }
+
+                // Данные изменились - обновляем
+                console.log('🔄 Обновление списка маршрутов (Silent Polling)');
+                lastRoutesJson = newRoutesJson;
+
+                // Запоминаем выбранный маршрут
+                const selectedRouteId = state.selectedRouteId;
+
+                // Запоминаем скролл
+                const scrollTop = routesList.scrollTop;
+
+                // Обновляем состояние
+                state.routes = newRoutes.map(route => ({
+                    ...route,
+                    orders_count: route.orders ? route.orders.length : 0,
+                    distance_km: route.distance_km || (Math.random() * 20 + 5).toFixed(1),
+                    duration_min: route.duration_min || 60,
+                    vehicle_type: route.vehicle_type || 'car'
+                }));
+
+                // Перерисовываем только список (не карту!)
+                filterAndRenderRoutes();
+                updateStats();
+
+                // Восстанавливаем выбранный маршрут
+                if (selectedRouteId) {
+                    state.selectedRouteId = selectedRouteId;
+                    const selectedCard = routesList.querySelector(`[data-route-id="${selectedRouteId}"]`);
+                    if (selectedCard) {
+                        selectedCard.classList.add('selected');
+                    }
+                }
+
+                // Восстанавливаем скролл
+                routesList.scrollTop = scrollTop;
+
+            } catch (error) {
+                console.error('Error in autoUpdateRoutes:', error);
+            }
+        }
+
         // ===== Initial Load =====
         await loadRoutes();
         await loadUnassignedOrders();
+        startCourierTracking(); // Start tracking courier locations
+
+        // Тихое автообновление маршрутов каждые 5 секунд
+        setInterval(autoUpdateRoutes, 5000);
 
         // Reload unassigned orders when date changes
         dayInput.addEventListener('change', loadUnassignedOrders);

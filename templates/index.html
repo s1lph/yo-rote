@@ -647,6 +647,28 @@
 </div>
 {% endblock %}
 
+{% block footer %}
+<footer class="site-footer">
+    <div class="footer-content">
+        <div class="footer-info">
+            <span class="footer-logo">yo.route {}</span>
+            <p class="footer-description">Сервис оптимизации маршрутов доставки для курьерских служб</p>
+        </div>
+        <div class="footer-links">
+            <a href="https://t.me/yoroutebot" target="_blank" rel="noopener noreferrer" class="footer-link">
+                <i class="fi fi-sr-paper-plane"></i> Telegram бот
+            </a>
+            <a href="https://s1lph.vercel.app/" target="_blank" rel="noopener noreferrer" class="footer-link">
+                <i class="fi fi-sr-user"></i> Разработчик
+            </a>
+        </div>
+        <div class="footer-copyright">
+            © 2025 yo.route. Все права защищены.
+        </div>
+    </div>
+</footer>
+{% endblock %}
+
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {

@@ -76,14 +76,57 @@ class Courier(db.Model):
     start_lon = db.Column(db.Float, default=37.6173)
     
     auth_key = db.Column(db.String(255))
+    
+    # Telegram интеграция
+    auth_code = db.Column(db.String(6), unique=True, nullable=True)  # 6-значный код авторизации
+    telegram_chat_id = db.Column(db.String(50), nullable=True)  # ID чата Telegram
+    
+    # Live-трекинг курьера
+    current_lat = db.Column(db.Float, nullable=True)  # Текущая широта
+    current_lon = db.Column(db.Float, nullable=True)  # Текущая долгота
+    is_on_shift = db.Column(db.Boolean, default=False)  # Статус смены (на линии / не на линии)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     routes = db.relationship('Route', backref='courier', lazy=True)
     
+    def generate_auth_code(self, force=False):
+        """
+        Генерация 6-значного кода авторизации для Telegram-бота.
+        Код генерируется из символов A-Z и 0-9.
+        
+        Args:
+            force: Если True, генерирует новый код даже если старый существует
+        """
+        import random
+        import string
+        
+        if self.auth_code and not force:
+            return self.auth_code
+        
+        # Генерируем уникальный код
+        chars = string.ascii_uppercase + string.digits
+        max_attempts = 10
+        
+        for _ in range(max_attempts):
+            code = ''.join(random.choices(chars, k=6))
+            # Проверяем уникальность
+            existing = Courier.query.filter_by(auth_code=code).first()
+            if not existing or existing.id == self.id:
+                self.auth_code = code
+                return code
+        
+        # Если не удалось за 10 попыток, используем timestamp
+        import time
+        code = ''.join(random.choices(chars, k=4)) + str(int(time.time()) % 100).zfill(2)
+        self.auth_code = code
+        return code
+    
     def __repr__(self):
         return f'<Courier {self.full_name}>'
+
     
     def to_dict(self):
         """Сериализация в словарь для JSON"""
@@ -117,9 +160,16 @@ class Courier(db.Model):
             'capacity': self.capacity,
             'start_lat': self.start_lat,
             'start_lon': self.start_lon,
+            'current_lat': self.current_lat,
+            'current_lon': self.current_lon,
+            'is_on_shift': self.is_on_shift,
             'current_order': current_order,
+            'auth_code': self.auth_code,
+            'telegram_chat_id': self.telegram_chat_id,
+            'telegram_connected': bool(self.telegram_chat_id),
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
 
 
 class Order(db.Model):
@@ -151,8 +201,14 @@ class Order(db.Model):
     comment = db.Column(db.Text)
     company = db.Column(db.String(200))
     
-    # Статус: planned, in_progress, completed
+    # Статус: planned, in_progress, completed, failed
     status = db.Column(db.String(20), default='planned')
+    
+    # Фото-отчет (Proof of Delivery)
+    proof_image = db.Column(db.String(255), nullable=True)  # Путь к файлу фото подтверждения
+    
+    # Причина отказа (если статус failed)
+    failure_reason = db.Column(db.String(255), nullable=True)
     
     # Прямое закрепление курьера за заказом
     courier_id = db.Column(db.Integer, db.ForeignKey('couriers.id'), nullable=True)
@@ -205,6 +261,8 @@ class Order(db.Model):
             'comment': self.comment,
             'company': self.company,
             'status': self.status,
+            'proof_image': self.proof_image,
+            'failure_reason': self.failure_reason,
             'courier_id': self.courier_id,
             'point_id': self.point_id,
             'point_address': point_address,

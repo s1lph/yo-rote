@@ -19,7 +19,7 @@
                         <th>Тип транспорта</th>
                         <th>Номер телефона</th>
                         <th>Телеграм</th>
-                        <th>Ключ Аутентификации</th>
+                        <th>Telegram-бот</th>
                         <th>Текущий заказ</th>
                     </tr>
                 </thead>
@@ -41,8 +41,8 @@
         </div>
 
         <div style="margin-bottom: 16px;">
-            <a href="t.me/example" target="_blank"
-                style="color: var(--primary-blue); text-decoration: none;">t.me/example ↑</a>
+            <a href="https://t.me/yoroutebot" target="_blank"
+                style="color: var(--primary-blue); text-decoration: none;">t.me/yoroutebot ↑</a>
         </div>
 
         <form action="/api/couriers" method="POST" id="courier-form" data-custom-submit="true">
@@ -73,11 +73,10 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="auth_key">Введите ключ аутентификации</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="auth_key" name="auth_key" class="form-input" required>
-                    <button type="button" class="btn btn-secondary" data-popup="auth-instruction-popup">Как?</button>
-                </div>
+                <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">
+                    💡 После создания курьера будет сгенерирован код для привязки Telegram-бота.
+                    <a href="#" data-popup="auth-instruction-popup" style="color: var(--primary-blue);">Подробнее</a>
+                </p>
             </div>
 
             <button type="submit" class="btn btn-primary">Сохранить</button>
@@ -97,6 +96,9 @@
         <button class="btn btn-secondary" id="edit-courier-btn">
             <i class="fi fi-sr-edit"></i> Изменить
         </button>
+        <button class="btn btn-secondary" id="regenerate-code-btn">
+            <i class="fi fi-sr-refresh"></i> Новый код
+        </button>
         <button class="btn btn-secondary" id="delete-courier-btn">
             <i class="fi fi-sr-trash"></i> Удалить
         </button>
@@ -107,12 +109,17 @@
 <div class="popup" id="auth-instruction-popup">
     <div class="popup-content">
         <button class="popup-close">&times;</button>
-        <h3 class="popup-title">Инструкция получения кода аутентификации для курьера</h3>
+        <h3 class="popup-title">Как привязать Telegram-бота водителю</h3>
         <ol style="padding-left: 20px; line-height: 2;">
-            <li>Зарегистрироваться в боте</li>
-            <li>Нажать кнопку "Генерация кода"</li>
-            <li>Перенести код в поле регистрации</li>
+            <li>Откройте бота: <a href="https://t.me/yoroutebot" target="_blank"
+                    style="color: var(--primary-blue);">t.me/yoroutebot</a></li>
+            <li>Нажмите <b>/start</b> в боте</li>
+            <li>Введите 6-значный код из таблицы курьеров</li>
+            <li>После привязки водитель будет получать маршруты!</li>
         </ol>
+        <p style="margin-top: 16px; color: var(--text-secondary); font-size: 13px;">
+            ✅ = Бот привязан &nbsp;&nbsp; ⏳ = Ожидает привязки (код активен)
+        </p>
     </div>
 </div>
 {% endblock %}
@@ -131,6 +138,7 @@
         const clearCourierSelection = document.getElementById('clear-courier-selection');
         const editCourierBtn = document.getElementById('edit-courier-btn');
         const deleteCourierBtn = document.getElementById('delete-courier-btn');
+        const regenerateCodeBtn = document.getElementById('regenerate-code-btn');
         const courierForm = document.getElementById('courier-form');
         const couriersTableBody = document.getElementById('couriers-table-body');
 
@@ -164,24 +172,127 @@
             });
         }
 
-        // Рендеринг курьеров в таблицу
+        // === SMART POLLING (Точечное обновление) ===
+        async function refreshCouriersSmart() {
+            try {
+                const response = await api.get('/api/couriers');
+                const couriers = response.couriers || [];
+
+                // 1. Map existing rows
+                const existingRows = new Map();
+                document.querySelectorAll('#couriers-table-body tr[data-courier-id]').forEach(row => {
+                    const id = row.getAttribute('data-courier-id');
+                    if (id) existingRows.set(id, row);
+                });
+
+                const processedIds = new Set();
+
+                // Helper for telegram status
+                const getTelegramStatus = (c) => {
+                    if (c.telegram_connected) {
+                        return '<span style="color: #22c55e;" title="Бот привязан">✅ Привязан</span>';
+                    } else if (c.auth_code) {
+                        return `<span style="color: #f59e0b;" title="Ожидает привязки">⏳ <code style="background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${c.auth_code}</code></span>`;
+                    }
+                    return '<span style="color: var(--text-secondary);">---</span>';
+                };
+
+                // 2. Process new data
+                couriers.forEach(courier => {
+                    const id = courier.id.toString();
+                    processedIds.add(id);
+
+                    const cellData = [
+                        null, // Radio
+                        courier.full_name || '',
+                        vehicleTypeMap[courier.vehicle_type] || courier.vehicle_type || '',
+                        courier.phone || '',
+                        courier.telegram || '',
+                        getTelegramStatus(courier),
+                        courier.current_order || '-'
+                    ];
+
+                    let row = existingRows.get(id);
+
+                    if (row) {
+                        // Update existing
+                        const cells = row.cells;
+                        for (let i = 1; i < cells.length; i++) {
+                            const newData = cellData[i];
+                            if (cells[i].innerHTML.trim() !== newData.trim()) {
+                                cells[i].innerHTML = newData;
+                            }
+                        }
+                    } else {
+                        // Create new
+                        row = document.createElement('tr');
+                        row.setAttribute('data-courier-id', id);
+                        row.innerHTML = `
+                            <td><input type="radio" name="selected_courier" value="${courier.id}"></td>
+                            <td>${cellData[1]}</td>
+                            <td>${cellData[2]}</td>
+                            <td>${cellData[3]}</td>
+                            <td>${cellData[4]}</td>
+                            <td>${cellData[5]}</td>
+                            <td>${cellData[6]}</td>
+                        `;
+                        couriersTableBody.appendChild(row);
+                        updateRadioButtons();
+                    }
+                });
+
+                // 3. Remove deleted
+                existingRows.forEach((row, id) => {
+                    if (!processedIds.has(id)) row.remove();
+                });
+
+                // Empty state handling
+                const hasRows = couriersTableBody.querySelectorAll('tr[data-courier-id]').length > 0;
+                const emptyRow = couriersTableBody.querySelector('tr:not([data-courier-id])');
+
+                if (!hasRows && !emptyRow) {
+                    couriersTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px;">Курьеров пока нет</td></tr>';
+                } else if (hasRows && emptyRow) {
+                    emptyRow.remove();
+                }
+
+                updateSelectedCourierPanel();
+
+            } catch (error) {
+                console.error('Error in smart refresh:', error);
+            }
+        }
+
+        // Рендеринг курьеров в таблицу (Initial load)
         function renderCouriers(couriers) {
             if (!couriers || couriers.length === 0) {
                 couriersTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px;">Курьеров пока нет</td></tr>';
                 return;
             }
 
-            couriersTableBody.innerHTML = couriers.map(courier => `
-                <tr>
-                    <td><input type="radio" name="selected_courier" value="${courier.id}"></td>
-                    <td>${courier.full_name || ''}</td>
-                    <td>${vehicleTypeMap[courier.vehicle_type] || courier.vehicle_type || ''}</td>
-                    <td>${courier.phone || ''}</td>
-                    <td>${courier.telegram || ''}</td>
-                    <td>********</td>
-                    <td>${courier.current_order || '-'}</td>
-                </tr>
-            `).join('');
+            couriersTableBody.innerHTML = couriers.map(courier => {
+                // Формируем статус Telegram
+                let telegramStatus = '';
+                if (courier.telegram_connected) {
+                    telegramStatus = '<span style="color: #22c55e;" title="Бот привязан">✅ Привязан</span>';
+                } else if (courier.auth_code) {
+                    telegramStatus = `<span style="color: #f59e0b;" title="Ожидает привязки">⏳ <code style="background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${courier.auth_code}</code></span>`;
+                } else {
+                    telegramStatus = '<span style="color: var(--text-secondary);">---</span>';
+                }
+
+                return `
+                    <tr data-courier-id="${courier.id}">
+                        <td><input type="radio" name="selected_courier" value="${courier.id}"></td>
+                        <td>${courier.full_name || ''}</td>
+                        <td>${vehicleTypeMap[courier.vehicle_type] || courier.vehicle_type || ''}</td>
+                        <td>${courier.phone || ''}</td>
+                        <td>${courier.telegram || ''}</td>
+                        <td>${telegramStatus}</td>
+                        <td>${courier.current_order || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
 
             updateRadioButtons();
             updateSelectedCourierPanel();
@@ -195,6 +306,9 @@
             console.error('Error loading couriers:', error);
             renderCouriers([]);
         }
+
+        // Auto-refresh every 3s
+        setInterval(refreshCouriersSmart, 3000);
 
         // Инициализация обработчиков
         updateRadioButtons();
@@ -276,6 +390,39 @@
                         updateRadioButtons();
                     } else {
                         showNotification(result.message || 'Ошибка при удалении', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Ошибка соединения с сервером', 'error');
+                }
+            }
+        });
+
+        // Генерация нового кода
+        regenerateCodeBtn.addEventListener('click', async function () {
+            const selected = document.querySelector('input[name="selected_courier"]:checked');
+            if (!selected) return;
+
+            const courierId = selected.value;
+            const row = selected.closest('tr');
+            const courierName = row.cells[1].textContent;
+
+            if (confirm(`Сгенерировать новый код для "${courierName}"?\n\nТекущая привязка Telegram будет сброшена.`)) {
+                try {
+                    const response = await fetch(`/api/couriers/${courierId}/regenerate-code`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showNotification(`Новый код: ${result.auth_code}`, 'success');
+                        // Перезагружаем список курьеров
+                        const couriersData = await api.get('/api/couriers');
+                        renderCouriers(couriersData.couriers || []);
+                    } else {
+                        showNotification(result.message || 'Ошибка генерации кода', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
