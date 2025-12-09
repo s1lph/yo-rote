@@ -12,44 +12,59 @@
     <div class="logo" style="text-align: center; margin-bottom: 32px; border: none; padding: 0;">
         yo.route {}
     </div>
-    
+
     <h1 class="page-title" style="text-align: center; margin-bottom: 32px;">Регистрация</h1>
-    
+
     <form action="/api/register" method="POST" data-redirect="/orders" id="registration-form">
         <div class="form-group">
             <label class="form-label" for="company_name">Название компании</label>
             <input type="text" id="company_name" name="company_name" class="form-input" required>
         </div>
-        
+
         <div class="form-group">
             <label class="form-label" for="activity">Деятельность</label>
             <input type="text" id="activity" name="activity" class="form-input" required>
         </div>
-        
+
         <div class="form-group">
             <label class="form-label" for="email">Почта</label>
             <input type="email" id="email" name="email" class="form-input" required>
         </div>
-        
+
         <div class="form-group">
             <label class="form-label" for="phone">Номер телефона</label>
             <input type="tel" id="phone" name="phone" class="form-input" required>
         </div>
-        
+
+        <div class="form-group">
+            <label class="form-label" for="password">Пароль</label>
+            <input type="password" id="password" name="password" class="form-input" minlength="6" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="password_confirm">Подтверждение пароля</label>
+            <input type="password" id="password_confirm" name="password_confirm" class="form-input" minlength="6"
+                required>
+        </div>
+
         <div class="checkbox-group">
             <input type="checkbox" id="terms" name="terms" class="checkbox-input" required>
             <label for="terms" class="checkbox-label">
-                Я согласен с <a href="#" id="terms-link" style="color: var(--primary-blue); text-decoration: underline; cursor: pointer;" onclick="event.stopPropagation();">Условиями использования</a>
+                Я согласен с <a href="#" id="terms-link"
+                    style="color: var(--primary-blue); text-decoration: underline; cursor: pointer;"
+                    onclick="event.stopPropagation();">Условиями использования</a>
             </label>
         </div>
-        
+
         <button type="submit" class="btn btn-primary">Создать компанию</button>
-        
-        <div style="text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+
+        <div
+            style="text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
             <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 12px;">
                 Уже есть аккаунт?
             </p>
-            <a href="/login" style="color: var(--primary-blue); text-decoration: none; font-weight: 500; font-size: 14px;">
+            <a href="/login"
+                style="color: var(--primary-blue); text-decoration: none; font-weight: 500; font-size: 14px;">
                 Войти
             </a>
         </div>
@@ -74,41 +89,41 @@
             this.cursorCharacter = options.cursorCharacter || '|';
             this.cursorBlinkDuration = options.cursorBlinkDuration || 0.5;
             this.textColors = options.textColors || [];
-            
+
             this.displayedText = '';
             this.currentCharIndex = 0;
             this.isDeleting = false;
             this.currentTextIndex = 0;
             this.timeout = null;
-            
+
             this.init();
         }
-        
+
         init() {
-            this.element.innerHTML = '<span class="text-type__content"></span>' + 
+            this.element.innerHTML = '<span class="text-type__content"></span>' +
                 (this.showCursor ? `<span class="text-type__cursor">${this.cursorCharacter}</span>` : '');
-            
+
             this.contentSpan = this.element.querySelector('.text-type__content');
             this.cursorSpan = this.element.querySelector('.text-type__cursor');
-            
+
             if (this.cursorSpan) {
                 this.cursorSpan.style.animation = `text-type-blink ${this.cursorBlinkDuration}s infinite`;
             }
-            
+
             if (this.initialDelay > 0) {
                 setTimeout(() => this.animate(), this.initialDelay);
             } else {
                 this.animate();
             }
         }
-        
+
         animate() {
             if (this.timeout) {
                 clearTimeout(this.timeout);
             }
-            
+
             const currentText = this.text[this.currentTextIndex];
-            
+
             if (this.isDeleting) {
                 if (this.displayedText === '') {
                     this.isDeleting = false;
@@ -117,7 +132,7 @@
                     this.timeout = setTimeout(() => this.animate(), this.pauseDuration);
                     return;
                 }
-                
+
                 this.displayedText = this.displayedText.slice(0, -1);
                 this.updateDisplay();
                 this.timeout = setTimeout(() => this.animate(), this.deletingSpeed);
@@ -138,18 +153,18 @@
                 }
             }
         }
-        
+
         updateDisplay() {
             if (this.contentSpan) {
-                const color = this.textColors.length > 0 
-                    ? this.textColors[this.currentTextIndex % this.textColors.length] 
+                const color = this.textColors.length > 0
+                    ? this.textColors[this.currentTextIndex % this.textColors.length]
                     : '';
                 this.contentSpan.textContent = this.displayedText;
                 if (color) {
                     this.contentSpan.style.color = color;
                 }
             }
-            
+
             if (this.cursorSpan && this.hideCursorWhileTyping) {
                 const isTyping = this.currentCharIndex < this.text[this.currentTextIndex].length;
                 if (isTyping || this.isDeleting) {
@@ -160,8 +175,8 @@
             }
         }
     }
-    
-    document.addEventListener('DOMContentLoaded', function() {
+
+    document.addEventListener('DOMContentLoaded', function () {
         // Initialize TextType animation
         const textTypeElement = document.getElementById('text-type');
         if (textTypeElement) {
@@ -174,12 +189,12 @@
                 loop: true
             });
         }
-        
+
         const termsLink = document.getElementById('terms-link');
         const registrationForm = document.getElementById('registration-form');
-        
+
         if (termsLink) {
-            termsLink.addEventListener('click', function(e) {
+            termsLink.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 // Можно открыть модальное окно или перейти на страницу с условиями
@@ -187,35 +202,40 @@
                 // Или: window.open('/terms', '_blank');
             });
         }
-        
+
         if (registrationForm) {
-            registrationForm.addEventListener('submit', async function(e) {
+            registrationForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
                 const formData = new FormData(this);
                 const data = Object.fromEntries(formData);
-                
+
+                // Проверка совпадения паролей
+                if (data.password !== data.password_confirm) {
+                    showNotification('Пароли не совпадают', 'error');
+                    return;
+                }
+
+                // Удаляем password_confirm перед отправкой
+                delete data.password_confirm;
+
                 // Преобразуем terms в boolean
                 data.terms = data.terms === 'on';
-                
+
                 try {
                     const response = await fetch('/api/register', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(data)
+                        body: JSON.stringify(data),
+                        credentials: 'include'  // Важно для работы с сессиями
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (result.success) {
                         showNotification('Компания успешно создана', 'success');
-                        
-                        // Сохраняем токен если он есть
-                        if (result.token) {
-                            localStorage.setItem('auth_token', result.token);
-                        }
-                        
+
                         // Редирект после успешной регистрации
                         const redirect = this.dataset.redirect || '/orders';
                         setTimeout(() => {
@@ -233,4 +253,3 @@
     });
 </script>
 {% endblock %}
-

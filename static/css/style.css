@@ -36,6 +36,7 @@ body {
     min-height: 100vh;
     position: relative;
     transition: background 0.5s ease, color 0.5s ease;
+    overflow-x: hidden;
 }
 
 /* Дополнительный слой для более плавного переливания */
@@ -457,7 +458,7 @@ body::after {
     height: auto;
     min-height: auto;
     max-height: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); */
     border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
@@ -506,7 +507,7 @@ body::after {
     overflow-x: auto;
     overflow-y: visible;
     border: 1px solid rgba(255, 255, 255, 0.3);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); */
 }
 
 .table {
@@ -1893,6 +1894,9 @@ body.theme-dark .selection-panel.active:hover {
     display: flex;
     align-items: center;
     gap: 16px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .selection-panel-text {
@@ -1900,6 +1904,9 @@ body.theme-dark .selection-panel.active:hover {
     font-size: 14px;
     color: var(--text-dark);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
 }
 
 body.theme-dark .selection-panel-text {
@@ -1938,6 +1945,7 @@ body.theme-dark .selection-panel-close:hover {
 .selection-panel-actions {
     display: flex;
     gap: 10px;
+    flex-shrink: 0;
 }
 
 .selection-panel-actions .btn {
@@ -1948,4 +1956,89 @@ body.theme-dark .selection-panel-close:hover {
 
 .selection-panel-actions .btn:hover {
     transform: translateY(-1px);
+}
+
+/* Footer Styles */
+.site-footer {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 20px 40px;
+    box-shadow:
+        0 -4px 24px rgba(37, 99, 235, 0.08),
+        0 -2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.footer-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.footer-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.footer-logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-blue);
+    white-space: nowrap;
+}
+
+.footer-description {
+    font-size: 13px;
+    color: var(--text-gray);
+    margin: 0;
+}
+
+.footer-links {
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;
+}
+
+.footer-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(248, 250, 252, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    border-radius: 10px;
+    color: var(--text-dark);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.04);
+    white-space: nowrap;
+}
+
+.footer-link:hover {
+    border-color: var(--primary-blue);
+    color: var(--primary-blue);
+    transform: translateY(-2px);
+    box-shadow:
+        0 6px 16px rgba(37, 99, 235, 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.04);
+    background: rgba(240, 249, 255, 0.9);
+}
+
+.footer-link i {
+    font-size: 14px;
+}
+
+.footer-copyright {
+    font-size: 12px;
+    color: var(--text-gray);
+    white-space: nowrap;
 }

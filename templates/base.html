@@ -64,6 +64,8 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% block footer %}{% endblock %}
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
         // Применяем сохранённую тему при загрузке страницы

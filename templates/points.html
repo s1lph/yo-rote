@@ -3,6 +3,58 @@
 
 {% block title %}Точки отправки - yo.route{% endblock %}
 
+{% block extra_css %}
+<!-- Leaflet.js CSS for map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+    /* Autocomplete dropdown styles */
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        margin-top: 4px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .autocomplete-item {
+        padding: 14px 18px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease;
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .autocomplete-item-label {
+        font-size: 14px;
+        color: #1a1a1a;
+        line-height: 1.4;
+    }
+
+    #point-preview-map {
+        width: 100%;
+        height: 400px;
+        border-radius: 12px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="two-column" id="points-container" style="max-width: 100%;">
     <div class="column" style="padding-bottom: 80px;">
@@ -25,11 +77,17 @@
             <h2 class="page-title" style="font-size: 20px;">Добавление точки</h2>
         </div>
 
-        <form action="/api/points" method="POST" id="add-point-form">
+        <form action="/api/points" method="POST" id="add-point-form" data-custom-submit="true">
             <div class="form-group">
                 <label class="form-label" for="address">Адрес</label>
-                <input type="text" id="address" name="address" class="form-input" placeholder="Введите Адрес..."
-                    required>
+                <div style="position: relative;">
+                    <input type="text" id="address" name="address" class="form-input" placeholder="Введите адрес..."
+                        autocomplete="off" required>
+                    <div id="address-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
+                </div>
+                <!-- Скрытые поля для координат -->
+                <input type="hidden" id="point_lat" name="lat">
+                <input type="hidden" id="point_lon" name="lon">
             </div>
 
             <div class="checkbox-group">
@@ -40,8 +98,8 @@
             <button type="submit" class="btn btn-primary">Сохранить</button>
         </form>
 
-        <div class="map-container" style="margin-top: 24px; min-height: 400px;">
-            <div>Интерфейс добавления точки</div>
+        <div class="map-container" style="margin-top: 24px;">
+            <div id="point-preview-map"></div>
         </div>
     </div>
 </div>
@@ -66,6 +124,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Leaflet.js Library -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function () {
         const addPointBtn = document.getElementById('add-point-btn');
@@ -81,12 +142,346 @@
         const pointsList = document.getElementById('points-list');
         const makePrimaryCheckbox = document.getElementById('make_primary');
         const addressInput = document.getElementById('address');
+
+
+        // Элементы для автокомплита
+        const addressAutocomplete = document.getElementById('address-autocomplete');
+        const pointLatInput = document.getElementById('point_lat');
+        const pointLonInput = document.getElementById('point_lon');
+
+        // Leaflet map для превью точки
+        let previewMap = null;
+        let previewMarker = null;
+
         const state = {
             points: []
         };
 
+        // === ФУНКЦИИ СНАЧАЛА ===
+
+        // Debounce функция
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // === SMART POLLING (Точечное обновление) ===
+        async function refreshPointsSmart() {
+            try {
+                const { points = [] } = await api.get('/api/points');
+                state.points = points;
+
+                // 1. Map existing items
+                const existingItems = new Map();
+                document.querySelectorAll('#points-list .radio-item:has(input)').forEach(item => {
+                    const input = item.querySelector('input');
+                    if (input) existingItems.set(input.value, item);
+                });
+
+                const processedIds = new Set();
+
+                // 2. Process new data
+                points.forEach(point => {
+                    const id = point.id.toString();
+                    processedIds.add(id);
+
+                    let item = existingItems.get(id);
+                    const labelContent = `
+                        ${point.address}
+                        ${point.is_primary ? '<span class="primary-badge">Главная точка</span>' : ''}
+                    `.trim();
+
+                    if (item) {
+                        // Update existing
+                        // Update class
+                        const isPrimary = point.is_primary;
+                        if (item.classList.contains('primary-point') !== isPrimary) {
+                            if (isPrimary) item.classList.add('primary-point');
+                            else item.classList.remove('primary-point');
+                        }
+
+                        // Update label text if changed
+                        const label = item.querySelector('label');
+                        // Use a temp div to compare HTML content
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = labelContent;
+
+                        // Compare innerText/content to avoid whitespace issues or re-rendering if same
+                        // But here we deal with badge HTML, so innerHTML comparison is needed but normalized
+                        if (label.innerHTML.replace(/\s+/g, ' ').trim() !== labelContent.replace(/\s+/g, ' ').trim()) {
+                            label.innerHTML = labelContent;
+                        }
+
+                        // Update data attributes
+                        const input = item.querySelector('input');
+                        if (input.dataset.address !== point.address) input.dataset.address = point.address;
+                        if (input.dataset.primary !== String(point.is_primary)) input.dataset.primary = point.is_primary;
+
+                    } else {
+                        // Create new
+                        const div = document.createElement('div');
+                        div.className = `radio-item ${point.is_primary ? 'primary-point' : ''}`;
+                        div.innerHTML = `
+                            <input type="radio" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
+                            <label for="point-${point.id}">
+                                ${labelContent}
+                            </label>
+                        `;
+                        pointsList.appendChild(div);
+
+                        // Add listener
+                        const radio = div.querySelector('input');
+                        radio.addEventListener('change', updateSelectedPointPanel);
+                    }
+                });
+
+                // 3. Remove deleted
+                existingItems.forEach((item, id) => {
+                    if (!processedIds.has(id)) item.remove();
+                });
+
+                // Empty state handling
+                if (points.length === 0) {
+                    pointsList.innerHTML = `
+                        <div class="radio-item">
+                            <label>Точек пока нет</label>
+                        </div>
+                    `;
+                } else {
+                    // Remove "No points" placeholder if exists and actual points are present
+                    const placeholder = Array.from(pointsList.children).find(child => !child.querySelector('input'));
+                    if (placeholder && pointsList.children.length > 1) {
+                        placeholder.remove();
+                    }
+                }
+
+                updateSelectedPointPanel();
+
+            } catch (error) {
+                console.error('Error in smart refresh:', error);
+            }
+        }
+
+        async function loadPointsList() {
+            try {
+                const { points = [] } = await api.get('/api/points');
+                state.points = points;
+                renderPoints(points);
+            } catch (error) {
+                console.error('Error loading points:', error);
+                state.points = [];
+                renderPoints([]);
+            }
+        }
+
+        function renderPoints(points) {
+            if (!points.length) {
+                pointsList.innerHTML = `
+                    <div class="radio-item">
+                        <label>Точек пока нет</label>
+                    </div>
+                `;
+                selectedPointPanel.style.display = 'none';
+                return;
+            }
+
+            pointsList.innerHTML = points.map(point => `
+                <div class="radio-item ${point.is_primary ? 'primary-point' : ''}">
+                    <input type="radio" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
+                    <label for="point-${point.id}">
+                        ${point.address}
+                        ${point.is_primary ? '<span class="primary-badge">Главная точка</span>' : ''}
+                    </label>
+                </div>
+            `).join('');
+
+            updateRadioButtons();
+            updateSelectedPointPanel();
+        }
+
+        function updateSelectedPointPanel() {
+            const selected = document.querySelector('input[name="selected_point"]:checked');
+            if (selected) {
+                const address = selected.closest('.radio-item').querySelector('label').textContent.trim();
+                selectedPointText.textContent = `Выбрана: ${address}`;
+                selectedPointPanel.classList.add('active');
+            } else {
+                selectedPointPanel.classList.remove('active');
+            }
+        }
+
+        function updateRadioButtons() {
+            const radioButtons = document.querySelectorAll('input[name="selected_point"]');
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', updateSelectedPointPanel);
+            });
+        }
+
+        function selectPointById(pointId) {
+            const input = document.querySelector(`input[name="selected_point"][value="${pointId}"]`);
+            if (input) {
+                input.checked = true;
+                updateSelectedPointPanel();
+            }
+        }
+
+        function handleHashIntent() {
+            if (window.location.hash === '#add-point') {
+                setFormMode('create');
+                openAddPointForm();
+            }
+        }
+
+        function setFormMode(mode, point = null) {
+            const formTitle = addPointColumn.querySelector('.page-title');
+            if (mode === 'edit' && point) {
+                formTitle.textContent = 'Редактирование точки';
+                addressInput.value = point.address || '';
+                makePrimaryCheckbox.checked = !!point.is_primary;
+                addPointForm.dataset.editId = point.id;
+            } else {
+                formTitle.textContent = 'Добавление точки';
+                makePrimaryCheckbox.checked = true;
+                addPointForm.reset();
+                addPointForm.removeAttribute('data-edit-id');
+            }
+        }
+
+        function openAddPointForm() {
+            addPointColumn.style.display = 'block';
+            pointsContainer.classList.add('show-add-form');
+            setTimeout(() => {
+                addPointColumn.style.opacity = '1';
+            }, 10);
+        }
+
+        function closeAddPointForm() {
+            addPointColumn.style.opacity = '0';
+            setTimeout(() => {
+                addPointColumn.style.display = 'none';
+                pointsContainer.classList.remove('show-add-form');
+                addPointForm.reset();
+                addPointForm.removeAttribute('data-edit-id');
+                makePrimaryCheckbox.checked = true;
+                const formTitle = addPointColumn.querySelector('.page-title');
+                formTitle.textContent = 'Добавление точки';
+                if (window.location.hash === '#add-point') {
+                    history.replaceState(null, '', window.location.pathname);
+                }
+            }, 300);
+        }
+
+        // === ЗАГРУЗКА ДАННЫХ ===
         await loadPointsList();
+        setInterval(refreshPointsSmart, 3000); // Smart polling every 3s
         handleHashIntent();
+
+        // === АВТОКОМПЛИТ ===
+
+        // Автокомплит для адреса
+        let selectedAddress = null;
+
+        const searchAddresses = debounce(async function (query) {
+            if (query.length < 3) {
+                addressAutocomplete.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/geocode/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.suggestions && data.suggestions.length > 0) {
+                    displayAutocompleteSuggestions(data.suggestions);
+                } else {
+                    addressAutocomplete.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Autocomplete error:', error);
+                addressAutocomplete.style.display = 'none';
+            }
+        }, 500);
+
+        function displayAutocompleteSuggestions(suggestions) {
+            addressAutocomplete.innerHTML = '';
+            suggestions.forEach(suggestion => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerHTML = `<div class="autocomplete-item-label">${suggestion.label}</div>`;
+                item.addEventListener('click', () => selectAddressFromAutocomplete(suggestion));
+                addressAutocomplete.appendChild(item);
+            });
+            addressAutocomplete.style.display = 'block';
+        }
+
+        function selectAddressFromAutocomplete(suggestion) {
+            addressInput.value = suggestion.label;
+            pointLatInput.value = suggestion.lat;
+            pointLonInput.value = suggestion.lon;
+            addressAutocomplete.style.display = 'none';
+            selectedAddress = suggestion;
+
+            // Обновляем карту с новой локацией
+            updateMapPreview(suggestion.lat, suggestion.lon, suggestion.label);
+        }
+
+        // Инициализация превью карты
+        function initPreviewMap() {
+            if (!previewMap) {
+                previewMap = L.map('point-preview-map').setView([55.7558, 37.6173], 11);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(previewMap);
+            }
+        }
+
+        // Обновление карты с маркером
+        function updateMapPreview(lat, lon, label) {
+            initPreviewMap();
+
+            // Удаляем предыдущий маркер
+            if (previewMarker) {
+                previewMap.removeLayer(previewMarker);
+            }
+
+            // Создаем иконку маркера
+            const markerIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background: #4CAF50; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="fi fi-sr-marker" style="font-size: 14px;"></i></div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            // Добавляем маркер
+            previewMarker = L.marker([lat, lon], { icon: markerIcon })
+                .bindPopup(`<b>Выбранная локация</b><br>${label}`)
+                .addTo(previewMap);
+
+            // Центрируем карту на маркере
+            previewMap.setView([lat, lon], 15);
+        }
+
+        addressInput.addEventListener('input', (e) => {
+            searchAddresses(e.target.value);
+            selectedAddress = null;
+            pointLatInput.value = '';
+            pointLonInput.value = '';
+        });
+
+        // Закрытие автокомплита при клике вне
+        document.addEventListener('click', (e) => {
+            if (!addressInput.contains(e.target) && !addressAutocomplete.contains(e.target)) {
+                addressAutocomplete.style.display = 'none';
+            }
+        });
 
         clearPointSelection.addEventListener('click', function () {
             document.querySelectorAll('input[name="selected_point"]').forEach(radio => radio.checked = false);
@@ -152,6 +547,11 @@
 
         addPointForm.addEventListener('submit', async function (e) {
             e.preventDefault();
+
+            // Предотвращаем двойную отправку
+            if (this.dataset.submitting === 'true') return;
+            this.dataset.submitting = 'true';
+
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
             data.make_primary = formData.get('make_primary') === 'on';
@@ -179,127 +579,10 @@
             } catch (error) {
                 console.error('Error saving point:', error);
                 showNotification('Ошибка соединения с сервером', 'error');
+            } finally {
+                this.dataset.submitting = 'false';
             }
         });
-
-        async function loadPointsList() {
-            try {
-                let { points = [] } = await api.get('/api/points');
-                if (!points.length) {
-                    points = getSamplePoints();
-                }
-                state.points = points;
-                renderPoints(points);
-            } catch (error) {
-                console.error('Error loading points:', error);
-                state.points = getSamplePoints();
-                renderPoints(state.points);
-            }
-        }
-
-        function renderPoints(points) {
-            if (!points.length) {
-                pointsList.innerHTML = `
-                    <div class="radio-item">
-                        <label>Точек пока нет</label>
-                    </div>
-                `;
-                selectedPointPanel.style.display = 'none';
-                return;
-            }
-
-            pointsList.innerHTML = points.map(point => `
-                <div class="radio-item ${point.is_primary ? 'primary-point' : ''}">
-                    <input type="radio" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
-                    <label for="point-${point.id}">
-                        ${point.address}
-                        ${point.is_primary ? '<span class="primary-badge">Главная точка</span>' : ''}
-                    </label>
-                </div>
-            `).join('');
-
-            updateRadioButtons();
-            updateSelectedPointPanel();
-        }
-
-        function updateSelectedPointPanel() {
-            const selected = document.querySelector('input[name="selected_point"]:checked');
-            if (selected) {
-                const address = selected.closest('.radio-item').querySelector('label').textContent.trim();
-                selectedPointText.textContent = `Выбрана: ${address}`;
-                selectedPointPanel.classList.add('active');
-            } else {
-                selectedPointPanel.classList.remove('active');
-            }
-        }
-
-        function updateRadioButtons() {
-            const radioButtons = document.querySelectorAll('input[name="selected_point"]');
-            radioButtons.forEach(radio => {
-                radio.addEventListener('change', updateSelectedPointPanel);
-            });
-        }
-
-        function openAddPointForm() {
-            addPointColumn.style.display = 'block';
-            pointsContainer.classList.add('show-add-form');
-            setTimeout(() => {
-                addPointColumn.style.opacity = '1';
-            }, 10);
-        }
-
-        function closeAddPointForm() {
-            addPointColumn.style.opacity = '0';
-            setTimeout(() => {
-                addPointColumn.style.display = 'none';
-                pointsContainer.classList.remove('show-add-form');
-                addPointForm.reset();
-                addPointForm.removeAttribute('data-edit-id');
-                makePrimaryCheckbox.checked = true;
-                const formTitle = addPointColumn.querySelector('.page-title');
-                formTitle.textContent = 'Добавление точки';
-                if (window.location.hash === '#add-point') {
-                    history.replaceState(null, '', window.location.pathname);
-                }
-            }, 300);
-        }
-
-        function setFormMode(mode, point = null) {
-            const formTitle = addPointColumn.querySelector('.page-title');
-            if (mode === 'edit' && point) {
-                formTitle.textContent = 'Редактирование точки';
-                addressInput.value = point.address || '';
-                makePrimaryCheckbox.checked = !!point.is_primary;
-                addPointForm.dataset.editId = point.id;
-            } else {
-                formTitle.textContent = 'Добавление точки';
-                makePrimaryCheckbox.checked = true;
-                addPointForm.reset();
-                addPointForm.removeAttribute('data-edit-id');
-            }
-        }
-
-        function selectPointById(pointId) {
-            const input = document.querySelector(`input[name="selected_point"][value="${pointId}"]`);
-            if (input) {
-                input.checked = true;
-                updateSelectedPointPanel();
-            }
-        }
-
-        function handleHashIntent() {
-            if (window.location.hash === '#add-point') {
-                setFormMode('create');
-                openAddPointForm();
-            }
-        }
-
-        function getSamplePoints() {
-            return [
-                { id: 1, address: 'Москва, ул. Оршанская 13', is_primary: true },
-                { id: 2, address: 'Химки, ул. Германа Титова 3', is_primary: false }
-            ];
-        }
     });
 </script>
 {% endblock %}
