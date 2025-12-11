@@ -1,6 +1,6 @@
 // Основные функции для работы с UI
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Инициализация всех компонентов
     initTabs();
     initPopups();
@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initTabs() {
     const tabs = document.querySelectorAll('.tab');
     tabs.forEach(tab => {
-        tab.addEventListener('click', function() {
+        tab.addEventListener('click', function () {
             const tabGroup = this.closest('.tabs');
             const allTabs = tabGroup.querySelectorAll('.tab');
             allTabs.forEach(t => t.classList.remove('active'));
@@ -24,9 +24,9 @@ function initTabs() {
 function initPopups() {
     const popupTriggers = document.querySelectorAll('[data-popup]');
     const popupCloses = document.querySelectorAll('.popup-close');
-    
+
     popupTriggers.forEach(trigger => {
-        trigger.addEventListener('click', function() {
+        trigger.addEventListener('click', function () {
             const popupId = this.getAttribute('data-popup');
             const popup = document.getElementById(popupId);
             if (popup) {
@@ -34,19 +34,19 @@ function initPopups() {
             }
         });
     });
-    
+
     popupCloses.forEach(close => {
-        close.addEventListener('click', function() {
+        close.addEventListener('click', function () {
             const popup = this.closest('.popup');
             if (popup) {
                 popup.classList.remove('active');
             }
         });
     });
-    
+
     // Закрытие по клику вне попапа
     document.querySelectorAll('.popup').forEach(popup => {
-        popup.addEventListener('click', function(e) {
+        popup.addEventListener('click', function (e) {
             if (e.target === this) {
                 this.classList.remove('active');
             }
@@ -59,8 +59,8 @@ function initForms() {
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         if (form.hasAttribute('data-custom-submit')) return;
-        
-        form.addEventListener('submit', function(e) {
+
+        form.addEventListener('submit', function (e) {
             e.preventDefault();
             handleFormSubmit(this);
         });
@@ -73,23 +73,19 @@ async function handleFormSubmit(form) {
     const data = Object.fromEntries(formData);
     const action = form.getAttribute('action') || form.getAttribute('data-action');
     const method = form.getAttribute('data-method') || form.getAttribute('method') || 'POST';
-    
+
     if (!action) {
         console.error('No action specified for form');
         return;
     }
-    
+
     try {
-        const response = await fetch(action, {
+        // Используем api.request для включения JWT токена
+        const result = await api.request(action, {
             method: method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(data)
         });
-        
-        const result = await response.json();
-        
+
         if (result.success) {
             showNotification('Успешно сохранено', 'success');
             if (form.dataset.redirect) {
@@ -111,13 +107,13 @@ function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
-    
+
     const colors = {
         success: '#10b981',
         error: '#ef4444',
         info: '#2563eb'
     };
-    
+
     notification.style.cssText = `
         position: fixed;
         top: 20px;
@@ -136,9 +132,9 @@ function showNotification(message, type = 'info') {
         transform-origin: top right;
         backdrop-filter: blur(10px);
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
         notification.style.animation = 'slideOutNotification 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
         setTimeout(() => {
@@ -156,40 +152,77 @@ function applyTheme(theme) {
     localStorage.setItem('theme', theme);
 }
 
-// API функции
+// API функции с поддержкой JWT токенов
 const api = {
+    // Получение токена из localStorage
+    getToken() {
+        return localStorage.getItem('auth_token');
+    },
+
+    // Сохранение токена в localStorage
+    setToken(token) {
+        localStorage.setItem('auth_token', token);
+    },
+
+    // Удаление токена из localStorage
+    clearToken() {
+        localStorage.removeItem('auth_token');
+    },
+
+    // Базовый метод для всех запросов
+    async request(url, options = {}) {
+        const token = this.getToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
+
+        // Добавляем токен если есть
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        try {
+            const response = await fetch(url, { ...options, headers });
+
+            // Авто-редирект на логин при 401
+            if (response.status === 401) {
+                this.clearToken();
+                // Не редиректим если уже на странице логина или регистрации
+                if (!window.location.pathname.includes('/login') &&
+                    !window.location.pathname.includes('/registration')) {
+                    window.location.href = '/login';
+                }
+                return { success: false, message: 'Требуется авторизация' };
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            return { success: false, message: 'Ошибка соединения с сервером' };
+        }
+    },
+
     async get(url) {
-        const response = await fetch(url);
-        return await response.json();
+        return this.request(url, { method: 'GET' });
     },
-    
+
     async post(url, data) {
-        const response = await fetch(url, {
+        return this.request(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(data)
         });
-        return await response.json();
     },
-    
+
     async put(url, data) {
-        const response = await fetch(url, {
+        return this.request(url, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(data)
         });
-        return await response.json();
     },
-    
+
     async delete(url) {
-        const response = await fetch(url, {
-            method: 'DELETE'
-        });
-        return await response.json();
+        return this.request(url, { method: 'DELETE' });
     }
 };
 

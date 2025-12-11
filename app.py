@@ -1,9 +1,12 @@
-from flask import Flask, render_template, jsonify, request, session
+from flask import Flask, render_template, jsonify, request, session, url_for
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 from functools import wraps
+from datetime import datetime, timedelta
 import pandas as pd
+import jwt
+from authlib.integrations.flask_client import OAuth
 
 
 # Загрузка переменных окружения из .env файла
@@ -25,13 +28,59 @@ app.config['SESSION_TYPE'] = 'filesystem'
 # Инициализация БД
 db.init_app(app)
 
+# Инициализация OAuth
+oauth = OAuth(app)
+oauth.register(
+    name='google',
+    client_id=os.getenv('GOOGLE_CLIENT_ID'),
+    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
+
 # Создание таблиц при первом запуске
 with app.app_context():
     db.create_all()
     print("✅ База данных инициализирована")
 
 
-# Декоратор для проверки аутентификации
+# Декоратор для проверки JWT токена с валидацией IP
+def token_required(f):
+    @wraps(f)
+    def decorated(current_user=None, *args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        if not token:
+            return jsonify({'success': False, 'message': 'Токен не предоставлен'}), 401
+        
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            current_user = User.query.get(data['user_id'])
+            if not current_user:
+                return jsonify({'success': False, 'message': 'Пользователь не найден'}), 401
+            
+            # Проверка IP адреса (если токен содержит IP)
+            if 'ip' in data:
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                if client_ip:
+                    client_ip = client_ip.split(',')[0].strip()  # Берём первый IP если несколько
+                if data['ip'] != client_ip:
+                    return jsonify({'success': False, 'message': 'Сессия недействительна (изменился IP)'}), 401
+                    
+        except jwt.ExpiredSignatureError:
+            return jsonify({'success': False, 'message': 'Токен истек'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'success': False, 'message': 'Недействительный токен'}), 401
+        
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+
+# Старый декоратор для совместимости (session-based)
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -39,6 +88,26 @@ def login_required(f):
             return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
         return f(*args, **kwargs)
     return decorated_function
+
+
+def get_current_user_id():
+    """
+    Получает user_id из JWT токена в заголовке Authorization.
+    Возвращает None если токен отсутствует или недействителен.
+    Также проверяет session для обратной совместимости.
+    """
+    # Сначала проверяем JWT токен
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            return data.get('user_id')
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            pass
+    
+    # Fallback на session для обратной совместимости
+    return session.get('user_id')
 
 # Главная страница - редирект на вход или дашборд
 @app.route('/')
@@ -133,13 +202,22 @@ def api_register():
     db.session.add(user)
     db.session.commit()
     
-    # Автоматический вход после регистрации
-    session['user_id'] = user.id
-    session['user_email'] = user.email
+    # Автоматический вход после регистрации - генерация JWT токена
+    # Получаем IP клиента для привязки сессии
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    
+    token = jwt.encode({
+        'user_id': user.id,
+        'ip': client_ip,
+        'exp': datetime.utcnow() + timedelta(hours=24)  # 24 часа по умолчанию
+    }, app.config['SECRET_KEY'], algorithm='HS256')
     
     return jsonify({
         'success': True,
         'message': 'Регистрация успешна',
+        'token': token,
         'user': user.to_dict()
     })
 
@@ -170,16 +248,29 @@ def api_login():
     if not user or not user.check_password(password):
         return jsonify({'success': False, 'message': 'Неверный email или пароль'}), 401
     
-    # Создание сессии
-    session['user_id'] = user.id
-    session['user_email'] = user.email
+    # Определяем срок действия токена: 7 дней если "запомнить", иначе 24 часа
+    remember = data.get('remember', False)
+    if remember:
+        token_expiry = timedelta(days=7)
+    else:
+        token_expiry = timedelta(hours=24)
     
-    if data.get('remember'):
-        session.permanent = True
+    # Получаем IP клиента для привязки сессии
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if client_ip:
+        client_ip = client_ip.split(',')[0].strip()  # Берём первый IP если несколько
+    
+    # Генерация JWT токена с IP для безопасности
+    token = jwt.encode({
+        'user_id': user.id,
+        'ip': client_ip,
+        'exp': datetime.utcnow() + token_expiry
+    }, app.config['SECRET_KEY'], algorithm='HS256')
     
     return jsonify({
         'success': True,
         'message': 'Вход выполнен успешно',
+        'token': token,
         'user': user.to_dict()
     })
 
@@ -191,22 +282,88 @@ def api_logout():
     session.clear()
     return jsonify({'success': True, 'message': 'Выход выполнен'})
 
+
+# ============================================
+# GOOGLE OAUTH 2.0 - Вход через Google
+# ============================================
+
+@app.route('/api/login/google')
+def api_login_google():
+    """
+    GET /api/login/google - Перенаправляет на авторизацию Google
+    """
+    redirect_uri = url_for('api_auth_google', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/api/auth/google')
+def api_auth_google():
+    """
+    GET /api/auth/google - Callback от Google OAuth
+    
+    Получает данные пользователя от Google, создает/находит пользователя в БД,
+    генерирует JWT токен и возвращает страницу с JS-редиректом.
+    """
+    try:
+        # Получаем токен от Google
+        token = oauth.google.authorize_access_token()
+        
+        # Получаем информацию о пользователе
+        userinfo = token.get('userinfo')
+        if not userinfo:
+            # Fallback: запрашиваем userinfo отдельно
+            resp = oauth.google.get('https://openidconnect.googleapis.com/v1/userinfo')
+            userinfo = resp.json()
+        
+        email = userinfo.get('email')
+        if not email:
+            return render_template('oauth_callback.html', error='Не удалось получить email от Google')
+        
+        # Проверяем существует ли пользователь
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            # Создаём нового пользователя
+            user = User(
+                email=email,
+                company_name=userinfo.get('name', email.split('@')[0]),
+                phone=''
+            )
+            # Генерируем случайный пароль-заглушку (пользователь не сможет войти по паролю)
+            import secrets
+            user.set_password(secrets.token_urlsafe(32))
+            
+            db.session.add(user)
+            db.session.commit()
+            print(f"✅ Создан новый пользователь через Google OAuth: {email}")
+        
+        # Генерируем JWT токен (как в обычном логине)
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if client_ip:
+            client_ip = client_ip.split(',')[0].strip()
+        
+        jwt_token = jwt.encode({
+            'user_id': user.id,
+            'ip': client_ip,
+            'exp': datetime.utcnow() + timedelta(days=7)  # 7 дней для OAuth
+        }, app.config['SECRET_KEY'], algorithm='HS256')
+        
+        return render_template('oauth_callback.html', token=jwt_token, error=None)
+        
+    except Exception as e:
+        print(f"❌ Ошибка Google OAuth: {e}")
+        return render_template('oauth_callback.html', error=str(e), token=None)
+
 @app.route('/api/user/current', methods=['GET'])
-def api_current_user():
+@token_required
+def api_current_user(current_user):
     """
     GET /api/user/current - Получение данных текущего пользователя
+    Требует JWT токен в заголовке Authorization: Bearer <token>
     """
-    if 'user_id' not in session:
-        return jsonify({'success': False, 'message': 'Не авторизован'}), 401
-    
-    user = User.query.get(session['user_id'])
-    if not user:
-        session.clear()
-        return jsonify({'success': False, 'message': 'Пользователь не найден'}), 404
-    
     return jsonify({
         'success': True,
-        'user': user.to_dict()
+        'user': current_user.to_dict()
      })
 
 # ============================================
@@ -391,7 +548,7 @@ def api_orders():
         search = request.args.get('search', None)
         
         # Базовый запрос - фильтрация по текущему пользователю
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         if user_id:
             query = Order.query.filter_by(user_id=user_id)
         else:
@@ -471,7 +628,7 @@ def api_orders():
         
         # Создание заказа с привязкой к текущему пользователю
         order = Order(
-            user_id=session.get('user_id'),
+            user_id=get_current_user_id(),
             order_name=data.get('order_name'),
             destination_point=data.get('destination_point', ''),
             address=address,
@@ -767,7 +924,7 @@ def import_orders():
             }), 400
         
         count = 0
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         
         for _, row in df.iterrows():
             addr = str(row['Адрес']).strip()
@@ -955,7 +1112,7 @@ def api_routes():
         status = request.args.get('status', None)
         
         # Базовый запрос - фильтрация по текущему пользователю
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         if user_id:
             query = Route.query.filter_by(user_id=user_id)
         else:
@@ -1003,7 +1160,7 @@ def api_routes():
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
         
         # Генерируем название маршрута
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         if user_id:
             routes_count = Route.query.filter_by(user_id=user_id).count()
         else:
@@ -1119,7 +1276,7 @@ def api_routes_optimize():
     if not date:
         return jsonify({'success': False, 'message': 'Не указана дата'}), 400
     
-    user_id = session.get('user_id')
+    user_id = get_current_user_id()
     
     # 2. Собираем данные из БД - курьеры
     if user_id:
@@ -1434,7 +1591,7 @@ def api_couriers():
     """
     if request.method == 'GET':
         # Фильтрация по текущему пользователю
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         if user_id:
             couriers = Courier.query.filter_by(user_id=user_id).all()
         else:
@@ -1480,7 +1637,7 @@ def api_couriers():
                 return jsonify({'success': False, 'message': 'Курьер с таким телефоном уже существует'}), 400
         
         courier = Courier(
-            user_id=session.get('user_id'),
+            user_id=get_current_user_id(),
             full_name=data['full_name'],
             phone=data.get('phone'),
             telegram=data.get('telegram'),
@@ -1652,7 +1809,7 @@ def api_courier_locations():
         ]
     }
     """
-    user_id = session.get('user_id')
+    user_id = get_current_user_id()
     route_id = request.args.get('route_id', None, type=int)
     
     # Базовый запрос - только курьеры на смене с координатами
@@ -1750,7 +1907,7 @@ def api_points():
     """
     if request.method == 'GET':
         # Фильтрация по текущему пользователю
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         if user_id:
             points = Point.query.filter_by(user_id=user_id).all()
         else:
@@ -1797,7 +1954,7 @@ def api_points():
                 longitude, latitude = coords  # geocode_address возвращает (lon, lat)
             
         # Если make_primary=true, снимаем флаг с других точек этого пользователя
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         make_primary = data.get('make_primary', False)
         if make_primary:
             Point.query.filter_by(user_id=user_id).update({Point.is_primary: False})
@@ -1984,9 +2141,28 @@ def api_account_profile():
         }
     }
     """
-    # Получение текущего пользователя из сессии
+    # Получение текущего пользователя из JWT токена или сессии
     user = None
-    if 'user_id' in session:
+    
+    # Сначала проверяем JWT токен
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            user = User.query.get(data['user_id'])
+            # Проверка IP если есть в токене
+            if user and 'ip' in data:
+                client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+                if client_ip:
+                    client_ip = client_ip.split(',')[0].strip()
+                if data['ip'] != client_ip:
+                    user = None  # IP изменился, сессия недействительна
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            user = None
+    
+    # Fallback на сессию если нет JWT
+    if not user and 'user_id' in session:
         user = User.query.get(session['user_id'])
     
     if request.method == 'GET':
@@ -2000,14 +2176,7 @@ def api_account_profile():
                 }
             })
         else:
-            return jsonify({
-                'profile': {
-                    'company_name': '',
-                    'email': '',
-                    'phone': '',
-                    'activity': ''
-                }
-            })
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
     else:
         """
         PUT /api/account/profile - Обновление данных профиля
@@ -2056,11 +2225,42 @@ def api_account_security():
         "message": "Пароль обновлен"
     }
     """
-    # TODO: Проверка текущего пароля
-    # TODO: Валидация нового пароля
-    # TODO: Сохранение нового пароля в БД
-    data = request.json
-    return jsonify({'success': True, 'message': 'Пароль обновлен'})
+    # Получаем текущего пользователя из JWT
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'Пользователь не найден'}), 404
+    
+    data = request.json or {}
+    
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+    confirm_password = data.get('confirm_password', '')
+    
+    # Проверка обязательных полей
+    if not current_password or not new_password or not confirm_password:
+        return jsonify({'success': False, 'message': 'Заполните все поля'}), 400
+    
+    # Проверка текущего пароля
+    if not user.check_password(current_password):
+        return jsonify({'success': False, 'message': 'Неверный текущий пароль'}), 400
+    
+    # Проверка совпадения паролей
+    if new_password != confirm_password:
+        return jsonify({'success': False, 'message': 'Новые пароли не совпадают'}), 400
+    
+    # Проверка минимальной длины
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'message': 'Пароль должен содержать минимум 6 символов'}), 400
+    
+    # Сохраняем новый пароль
+    user.set_password(new_password)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Пароль успешно обновлен'})
 
 # ============================================
 # USER API - Работа с пользователем

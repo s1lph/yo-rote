@@ -28,7 +28,8 @@ from aiogram.types import (
     KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    ContentType
+    ContentType,
+    FSInputFile
 )
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -40,8 +41,10 @@ load_dotenv()
 # Получение токена бота
 BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 
-# ID администратора для тревожных уведомлений (замените на реальный ID)
-ADMIN_ID = os.getenv('TG_ADMIN_ID', '123456789')
+# IDs администраторов для тревожных уведомлений (через запятую)
+# Можно указать несколько ID: 123456789,987654321
+ADMIN_IDS_STR = os.getenv('TG_ADMIN_ID', '123456789')
+ADMIN_IDS = [int(x.strip()) for x in ADMIN_IDS_STR.split(',') if x.strip().isdigit()]
 
 # Путь для сохранения фото подтверждений
 PROOFS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'proofs')
@@ -68,6 +71,12 @@ class DeliveryStates(StatesGroup):
     """Состояния для процесса доставки"""
     waiting_photo_proof = State()    # Ожидание фото подтверждения
     waiting_failure_reason = State() # Ожидание причины отказа
+
+
+class AdminStates(StatesGroup):
+    """Состояния для админ-панели"""
+    waiting_broadcast_message = State()  # Ожидание текста рассылки
+    waiting_alert_message = State()      # Ожидание текста тревоги
 
 
 # ============================================================================
@@ -145,23 +154,30 @@ def check_and_complete_route(route_id: int) -> bool:
 # Keyboard Generators
 # ============================================================================
 
-def get_main_menu_keyboard(is_on_shift: bool = False) -> ReplyKeyboardMarkup:
+def get_main_menu_keyboard(is_on_shift: bool = False, user_id: int = None) -> ReplyKeyboardMarkup:
     """
     Главное меню бота (Reply Keyboard).
     
     Args:
         is_on_shift: Находится ли курьер на смене
+        user_id: ID пользователя для проверки прав админа
     
     Returns:
         ReplyKeyboardMarkup с кнопками меню
     """
     shift_button = "🏁 Закончил смену" if is_on_shift else "📍 Начал смену"
     
+    keyboard_rows = [
+        [KeyboardButton(text=shift_button)],
+        [KeyboardButton(text="📋 Мои заказы"), KeyboardButton(text="🆘 Проблема")]
+    ]
+    
+    # Добавляем кнопку админ-панели для администраторов
+    if user_id and user_id in ADMIN_IDS:
+        keyboard_rows.append([KeyboardButton(text="🔐 Админ-панель")])
+    
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=shift_button)],
-            [KeyboardButton(text="📋 Мои заказы"), KeyboardButton(text="🆘 Проблема")]
-        ],
+        keyboard=keyboard_rows,
         resize_keyboard=True,
         is_persistent=True
     )
@@ -226,6 +242,27 @@ def generate_cancel_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
+def get_admin_keyboard() -> InlineKeyboardMarkup:
+    """
+    Клавиатура админ-панели.
+    
+    Returns:
+        InlineKeyboardMarkup с кнопками админки
+    """
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin:stats")],
+        [InlineKeyboardButton(text="📸 Фото-пруфы", callback_data="admin:proofs")],
+        [InlineKeyboardButton(text="📢 Рассылка курьерам", callback_data="admin:broadcast")],
+        [InlineKeyboardButton(text="🚨 ТРЕВОГА", callback_data="admin:alert")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="admin:close")]
+    ])
+
+
+def is_admin(user_id: int) -> bool:
+    """Проверка, является ли пользователь администратором"""
+    return user_id in ADMIN_IDS
+
+
 # ============================================================================
 # Command Handlers
 # ============================================================================
@@ -245,7 +282,7 @@ async def cmd_start(message: Message):
                 f"👋 *С возвращением, {courier.full_name}!*\n\n"
                 f"Вы готовы к работе. Используйте меню ниже для управления.",
                 parse_mode="Markdown",
-                reply_markup=get_main_menu_keyboard(courier.is_on_shift)
+                reply_markup=get_main_menu_keyboard(courier.is_on_shift, message.from_user.id)
             )
         else:
             # Новый пользователь
@@ -274,13 +311,425 @@ async def cmd_menu(message: Message):
             await message.answer(
                 "📱 *Главное меню*",
                 parse_mode="Markdown",
-                reply_markup=get_main_menu_keyboard(courier.is_on_shift)
+                reply_markup=get_main_menu_keyboard(courier.is_on_shift, message.from_user.id)
             )
         else:
             await message.answer(
                 "❌ Вы не авторизованы. Введите код авторизации.",
                 parse_mode="Markdown"
             )
+
+
+# ============================================================================
+# Admin Panel (Админ-панель)
+# ============================================================================
+
+@dp.message(Command("admin"))
+async def cmd_admin(message: Message):
+    """Открыть админ-панель"""
+    if not is_admin(message.from_user.id):
+        await message.answer(
+            "⛔ *Доступ запрещён*\n\n"
+            "У вас нет прав для доступа к админ-панели.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    await message.answer(
+        "🔐 *Админ-панель yo.route*\n\n"
+        "Выберите действие:",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
+
+
+@dp.message(F.text == "🔐 Админ-панель")
+async def btn_admin(message: Message):
+    """Открыть админ-панель через кнопку меню"""
+    if not is_admin(message.from_user.id):
+        await message.answer(
+            "⛔ *Доступ запрещён*\n\n"
+            "У вас нет прав для доступа к админ-панели.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    await message.answer(
+        "🔐 *Админ-панель yo.route*\n\n"
+        "Выберите действие:",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
+
+
+@dp.callback_query(F.data == "admin:stats")
+async def admin_stats(callback: CallbackQuery):
+    """Показать статистику"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён", show_alert=True)
+        return
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Courier, Order, Route
+        
+        # Статистика курьеров
+        total_couriers = Courier.query.count()
+        on_shift = Courier.query.filter_by(is_on_shift=True).count()
+        with_telegram = Courier.query.filter(Courier.telegram_chat_id.isnot(None)).count()
+        
+        # Статистика заказов за сегодня
+        from datetime import date
+        today = date.today().isoformat()
+        
+        active_routes = Route.query.filter_by(status='active').count()
+        completed_routes = Route.query.filter_by(status='completed', date=today).count()
+        
+        pending_orders = Order.query.filter_by(status='planned').count()
+        in_progress = Order.query.filter_by(status='in_progress').count()
+        completed_today = Order.query.filter_by(status='completed').count()
+        failed_today = Order.query.filter_by(status='failed').count()
+    
+    stats_text = (
+        "📊 *Статистика системы*\n\n"
+        "👥 *Курьеры:*\n"
+        f"  • Всего: {total_couriers}\n"
+        f"  • На смене: {on_shift}\n"
+        f"  • С Telegram: {with_telegram}\n\n"
+        "🚗 *Маршруты:*\n"
+        f"  • Активные: {active_routes}\n"
+        f"  • Завершено сегодня: {completed_routes}\n\n"
+        "📦 *Заказы:*\n"
+        f"  • Ожидают: {pending_orders}\n"
+        f"  • В работе: {in_progress}\n"
+        f"  • Доставлено: {completed_today}\n"
+        f"  • Отказы: {failed_today}\n\n"
+        f"⏰ Обновлено: {datetime.now().strftime('%H:%M:%S')}"
+    )
+    
+    await callback.message.edit_text(
+        stats_text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Обновить", callback_data="admin:stats")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin:menu")]
+        ])
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin:broadcast")
+async def admin_broadcast(callback: CallbackQuery, state: FSMContext):
+    """Начать рассылку курьерам"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён", show_alert=True)
+        return
+    
+    await state.set_state(AdminStates.waiting_broadcast_message)
+    
+    await callback.message.edit_text(
+        "📢 *Рассылка курьерам*\n\n"
+        "Введите текст сообщения, которое будет отправлено всем курьерам с привязанным Telegram.\n\n"
+        "_Поддерживается Markdown форматирование._",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="admin:cancel")]
+        ])
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin:alert")
+async def admin_alert(callback: CallbackQuery, state: FSMContext):
+    """Начать отправку тревоги"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён", show_alert=True)
+        return
+    
+    await state.set_state(AdminStates.waiting_alert_message)
+    
+    await callback.message.edit_text(
+        "🚨 *ТРЕВОГА - Экстренное оповещение*\n\n"
+        "⚠️ Это сообщение будет отправлено ВСЕМ курьерам на смене как срочное уведомление!\n\n"
+        "Введите текст тревоги:\n"
+        "_Например: Воздушная тревога! Немедленно найдите укрытие!_",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="admin:cancel")]
+        ])
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin:proofs")
+async def admin_proofs(callback: CallbackQuery):
+    """Показать список последних фото-пруфов"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён", show_alert=True)
+        return
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Order, Courier
+        
+        # Получаем последние 10 заказов с фото
+        orders_with_proofs = Order.query.filter(
+            Order.proof_image.isnot(None),
+            Order.status == 'completed'
+        ).order_by(Order.updated_at.desc()).limit(10).all()
+        
+        if not orders_with_proofs:
+            text = (
+                "📸 *Фото-пруфы*\n\n"
+                "📭 Пока нет завершённых заказов с фото подтверждением."
+            )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin:menu")]
+            ])
+            
+            if callback.message.photo:
+                await callback.message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
+            else:
+                await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            await callback.answer()
+            return
+        
+        # Формируем список кнопок для каждого заказа
+        buttons = []
+        for order in orders_with_proofs:
+            # Получаем имя курьера
+            courier_name = "—"
+            if order.route_id:
+                from models import Route
+                route = Route.query.get(order.route_id)
+                if route and route.courier_id:
+                    courier = Courier.query.get(route.courier_id)
+                    if courier:
+                        courier_name = courier.full_name
+            
+            # Форматируем дату
+            date_str = order.updated_at.strftime('%d.%m %H:%M') if order.updated_at else "—"
+            
+            button_text = f"📦 {order.order_name[:20]} | {courier_name[:15]} | {date_str}"
+            buttons.append([InlineKeyboardButton(
+                text=button_text, 
+                callback_data=f"proof:{order.id}"
+            )])
+        
+        buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin:menu")])
+        
+        text = (
+            "📸 *Фото-пруфы*\n\n"
+            "Последние 10 подтверждений доставки.\n"
+            "Нажмите на заказ, чтобы увидеть фото:"
+        )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        
+        # Проверяем, является ли сообщение фото
+        if callback.message.photo:
+            await callback.message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
+        else:
+            await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("proof:"))
+async def view_proof(callback: CallbackQuery):
+    """Показать фото-пруф конкретного заказа"""
+    if not is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён", show_alert=True)
+        return
+    
+    order_id = int(callback.data.split(":")[1])
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Order, Courier, Route
+        
+        order = Order.query.get(order_id)
+        
+        if not order or not order.proof_image:
+            await callback.answer("❌ Фото не найдено", show_alert=True)
+            return
+        
+        # Путь к файлу
+        photo_path = os.path.join(os.path.dirname(__file__), 'static', order.proof_image)
+        
+        if not os.path.exists(photo_path):
+            await callback.answer("❌ Файл фото не найден на сервере", show_alert=True)
+            return
+        
+        # Получаем информацию о курьере
+        courier_name = "—"
+        if order.route_id:
+            route = Route.query.get(order.route_id)
+            if route and route.courier_id:
+                courier = Courier.query.get(route.courier_id)
+                if courier:
+                    courier_name = courier.full_name
+        
+        # Формируем подпись
+        caption = (
+            f"📦 *{order.order_name}*\n\n"
+            f"📍 Адрес: {order.address or '—'}\n"
+            f"👤 Получатель: {order.recipient_name or '—'}\n"
+            f"🚗 Курьер: {courier_name}\n"
+            f"⏰ Доставлено: {order.updated_at.strftime('%d.%m.%Y %H:%M') if order.updated_at else '—'}"
+        )
+        
+        # Отправляем фото
+        photo = FSInputFile(photo_path)
+        await callback.message.answer_photo(
+            photo=photo,
+            caption=caption,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📸 Все пруфы", callback_data="admin:proofs")],
+                [InlineKeyboardButton(text="◀️ Меню", callback_data="admin:menu")]
+            ])
+        )
+    
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin:menu")
+async def admin_menu(callback: CallbackQuery, state: FSMContext):
+    """Вернуться в меню админки"""
+    await state.clear()
+    
+    # Проверяем, является ли сообщение фото (у него нет текста для редактирования)
+    if callback.message.photo:
+        # Если это фото, отправляем новое сообщение
+        await callback.message.answer(
+            "🔐 *Админ-панель yo.route*\n\n"
+            "Выберите действие:",
+            parse_mode="Markdown",
+            reply_markup=get_admin_keyboard()
+        )
+    else:
+        # Если это текстовое сообщение, редактируем его
+        await callback.message.edit_text(
+            "🔐 *Админ-панель yo.route*\n\n"
+            "Выберите действие:",
+            parse_mode="Markdown",
+            reply_markup=get_admin_keyboard()
+        )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin:cancel")
+async def admin_cancel(callback: CallbackQuery, state: FSMContext):
+    """Отмена действия в админке"""
+    await state.clear()
+    await callback.message.edit_text(
+        "🔐 *Админ-панель yo.route*\n\n"
+        "Действие отменено. Выберите следующее действие:",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin:close")
+async def admin_close(callback: CallbackQuery, state: FSMContext):
+    """Закрыть админ-панель"""
+    await state.clear()
+    await callback.message.delete()
+    await callback.answer("Админ-панель закрыта")
+
+
+# ============================================================================
+# Admin Message Handlers (FSM)
+# ============================================================================
+
+@dp.message(AdminStates.waiting_broadcast_message, F.text)
+async def process_broadcast_message(message: Message, state: FSMContext):
+    """Обработка и отправка рассылки"""
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        return
+    
+    broadcast_text = message.text.strip()
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Courier
+        
+        # Получаем всех курьеров с Telegram
+        couriers = Courier.query.filter(Courier.telegram_chat_id.isnot(None)).all()
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for courier in couriers:
+            try:
+                await bot.send_message(
+                    chat_id=courier.telegram_chat_id,
+                    text=f"📢 *Сообщение от диспетчера*\n\n{broadcast_text}",
+                    parse_mode="Markdown"
+                )
+                sent_count += 1
+            except Exception as e:
+                print(f"[ERROR] Failed to send broadcast to {courier.full_name}: {e}")
+                failed_count += 1
+    
+    await message.answer(
+        f"✅ *Рассылка завершена!*\n\n"
+        f"📤 Отправлено: {sent_count}\n"
+        f"❌ Ошибок: {failed_count}",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
+    await state.clear()
+
+
+@dp.message(AdminStates.waiting_alert_message, F.text)
+async def process_alert_message(message: Message, state: FSMContext):
+    """Обработка и отправка тревоги"""
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        return
+    
+    alert_text = message.text.strip()
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Courier
+        
+        # Получаем только курьеров на смене
+        couriers = Courier.query.filter(
+            Courier.telegram_chat_id.isnot(None),
+            Courier.is_on_shift == True
+        ).all()
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for courier in couriers:
+            try:
+                await bot.send_message(
+                    chat_id=courier.telegram_chat_id,
+                    text=(
+                        f"🚨🚨🚨 *ТРЕВОГА!* 🚨🚨🚨\n\n"
+                        f"{alert_text}\n\n"
+                        f"⚠️ _Это экстренное сообщение от диспетчера!_"
+                    ),
+                    parse_mode="Markdown"
+                )
+                sent_count += 1
+            except Exception as e:
+                print(f"[ERROR] Failed to send alert to {courier.full_name}: {e}")
+                failed_count += 1
+    
+    await message.answer(
+        f"🚨 *Тревога отправлена!*\n\n"
+        f"📤 Оповещено курьеров на смене: {sent_count}\n"
+        f"❌ Ошибок: {failed_count}",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
+    await state.clear()
 
 
 # ============================================================================
@@ -308,7 +757,7 @@ async def start_shift(message: Message):
             "📎 Скрепка → 📍 Геопозиция → *Транслировать* (выберите время)\n\n"
             "_Это позволит диспетчеру видеть ваше местоположение в реальном времени._",
             parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(is_on_shift=True)
+            reply_markup=get_main_menu_keyboard(is_on_shift=True, user_id=message.from_user.id)
         )
 
 
@@ -333,7 +782,7 @@ async def end_shift(message: Message):
             "🔴 *Смена завершена!*\n\n"
             "Спасибо за работу! Отдыхайте 🍵",
             parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(is_on_shift=False)
+            reply_markup=get_main_menu_keyboard(is_on_shift=False, user_id=message.from_user.id)
         )
 
 
@@ -389,7 +838,7 @@ async def handle_location_update(message: Message):
 
 @dp.message(F.text == "🆘 Проблема")
 async def emergency_button(message: Message):
-    """Тревожная кнопка - уведомление администратору"""
+    """Тревожная кнопка - уведомление администраторам"""
     app = get_flask_app()
     with app.app_context():
         from models import Courier
@@ -414,18 +863,26 @@ async def emergency_button(message: Message):
             f"⏰ Время: {datetime.now().strftime('%H:%M:%S %d.%m.%Y')}"
         )
         
-        try:
-            await bot.send_message(
-                chat_id=ADMIN_ID,
-                text=admin_message,
-                parse_mode="Markdown"
-            )
+        # Отправляем всем администраторам
+        sent_count = 0
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    chat_id=admin_id,
+                    text=admin_message,
+                    parse_mode="Markdown"
+                )
+                sent_count += 1
+            except Exception as e:
+                print(f"[ERROR] Failed to send emergency to admin {admin_id}: {e}")
+        
+        if sent_count > 0:
             await message.answer(
                 "✅ *Сообщение отправлено диспетчеру!*\n\n"
                 "Ожидайте, с вами свяжутся в ближайшее время.",
                 parse_mode="Markdown"
             )
-        except Exception as e:
+        else:
             await message.answer(
                 "⚠️ Не удалось отправить сообщение диспетчеру.\n"
                 "Пожалуйста, позвоните по телефону поддержки.",
@@ -785,7 +1242,7 @@ async def handle_auth_code(message: Message):
             f"Теперь вы будете получать уведомления о новых маршрутах! 🚗\n\n"
             f"Используйте меню ниже для управления.",
             parse_mode="Markdown",
-            reply_markup=get_main_menu_keyboard(courier.is_on_shift)
+            reply_markup=get_main_menu_keyboard(courier.is_on_shift, message.from_user.id)
         )
 
 
@@ -797,7 +1254,8 @@ async def main():
     """Запуск бота"""
     print("🤖 Запуск Telegram бота yo.route...")
     print(f"   Bot: @yoroutebot")
-    print(f"   Admin ID: {ADMIN_ID}")
+    print(f"   Admin IDs: {ADMIN_IDS}")
+    print("   Админ-панель: /admin")
     print("   Нажмите Ctrl+C для остановки")
     
     # Создаем директорию для фото

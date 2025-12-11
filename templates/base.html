@@ -9,6 +9,7 @@
     <link rel='stylesheet'
         href='https://cdn-uicons.flaticon.com/3.0.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
     <title>{% block title %}yo.route{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/image.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
     {% block extra_css %}{% endblock %}
 </head>
@@ -16,7 +17,11 @@
 <body>
     {% if show_menu %}
     <div class="sidebar">
-        <a href="/" class="logo" style="text-decoration: none; display: block;">yo.route {}</a>
+        <a href="/" class="logo" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+            <img src="{{ url_for('static', filename='img/image.png') }}" alt="yo.route"
+                style="height: 36px; width: auto; flex-shrink: 0;">
+            <span style="font-size: 22px; font-weight: 700; color: var(--primary-blue);">yo.route</span>
+        </a>
         <nav class="menu">
             <div class="menu-section">
                 <div class="menu-label">Рабочий процесс</div>
