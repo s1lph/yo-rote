@@ -1251,8 +1251,8 @@ async def handle_auth_code(message: Message):
 # ============================================================================
 
 async def main():
-    """Запуск бота"""
-    print("🤖 Запуск Telegram бота yo.route...")
+    """Запуск бота в polling режиме (для локальной разработки)"""
+    print("🤖 Запуск Telegram бота yo.route (POLLING)...")
     print(f"   Bot: @yoroutebot")
     print(f"   Admin IDs: {ADMIN_IDS}")
     print("   Админ-панель: /admin")
@@ -1261,11 +1261,75 @@ async def main():
     # Создаем директорию для фото
     ensure_proofs_dir()
     
-    # Пропускаем накопившиеся обновления
+    # Удаляем webhook и пропускаем накопившиеся обновления
     await bot.delete_webhook(drop_pending_updates=True)
     
     # Запуск polling
     await dp.start_polling(bot)
+
+
+# Webhook режим для Railway
+WEBHOOK_PATH = f"/webhook/telegram/{BOT_TOKEN}"
+WEBHOOK_URL = os.getenv('WEBHOOK_URL')  # Например: https://your-app.up.railway.app
+
+async def setup_webhook():
+    """Установка webhook для Telegram"""
+    if WEBHOOK_URL:
+        webhook_full_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
+        await bot.set_webhook(url=webhook_full_url, drop_pending_updates=True)
+        print(f"✅ Webhook установлен: {webhook_full_url}")
+        return True
+    return False
+
+
+async def process_webhook_update(update_data: dict):
+    """Обработка входящего update от Telegram"""
+    from aiogram.types import Update
+    update = Update.model_validate(update_data, context={"bot": bot})
+    await dp.feed_update(bot=bot, update=update)
+
+
+def init_bot_webhook(flask_app):
+    """
+    Интеграция бота с Flask приложением через webhook.
+    Вызывается из app.py при старте сервера.
+    """
+    import asyncio
+    from flask import request, Response
+    
+    # Создаем директорию для фото
+    ensure_proofs_dir()
+    
+    @flask_app.route(WEBHOOK_PATH, methods=['POST'])
+    def telegram_webhook():
+        """Endpoint для приёма обновлений от Telegram"""
+        if request.headers.get('content-type') == 'application/json':
+            update_data = request.get_json()
+            
+            # Запускаем обработку в event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(process_webhook_update(update_data))
+            finally:
+                loop.close()
+            
+            return Response('OK', status=200)
+        return Response('Bad Request', status=400)
+    
+    # Устанавливаем webhook асинхронно
+    if WEBHOOK_URL:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(setup_webhook())
+        finally:
+            loop.close()
+        print(f"🤖 Telegram бот (WEBHOOK режим) готов")
+    else:
+        print("⚠️  WEBHOOK_URL не установлен, бот не активирован")
+    
+    return True
 
 
 if __name__ == '__main__':

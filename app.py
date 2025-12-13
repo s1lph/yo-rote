@@ -48,6 +48,14 @@ with app.app_context():
     db.create_all()
     print("✅ База данных инициализирована")
 
+# Инициализация Telegram бота (webhook режим для production)
+if os.getenv('WEBHOOK_URL'):
+    try:
+        from bot import init_bot_webhook
+        init_bot_webhook(app)
+    except Exception as e:
+        print(f"⚠️  Ошибка инициализации Telegram бота: {e}")
+
 
 # Декоратор для проверки JWT токена с валидацией IP
 def token_required(f):
