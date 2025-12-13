@@ -373,14 +373,8 @@
 
             if (confirm(`Удалить курьера "${courierName}"?`)) {
                 try {
-                    const response = await fetch(`/api/couriers/${courierId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
-
-                    const result = await response.json();
+                    // Используем api.delete для включения JWT токена
+                    const result = await api.delete(`/api/couriers/${courierId}`);
 
                     if (result.success) {
                         showNotification('Курьер успешно удален', 'success');
@@ -409,12 +403,8 @@
 
             if (confirm(`Сгенерировать новый код для "${courierName}"?\n\nТекущая привязка Telegram будет сброшена.`)) {
                 try {
-                    const response = await fetch(`/api/couriers/${courierId}/regenerate-code`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-
-                    const result = await response.json();
+                    // Используем api.post для включения JWT токена
+                    const result = await api.post(`/api/couriers/${courierId}/regenerate-code`, {});
 
                     if (result.success) {
                         showNotification(`Новый код: ${result.auth_code}`, 'success');
@@ -477,17 +467,14 @@
 
             try {
                 const url = editId ? `/api/couriers/${editId}` : '/api/couriers';
-                const method = editId ? 'PUT' : 'POST';
 
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
+                // Используем api helper для включения JWT токена
+                let result;
+                if (editId) {
+                    result = await api.put(url, data);
+                } else {
+                    result = await api.post(url, data);
+                }
 
                 if (result.success) {
                     showNotification(editId ? 'Курьер успешно изменен' : 'Курьер успешно добавлен', 'success');

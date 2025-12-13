@@ -388,6 +388,9 @@
                         });
                         const result = await response.json();
                         if (result.success) {
+                            // Удаляем JWT токен из localStorage
+                            api.clearToken();
+
                             showNotification('Выход выполнен', 'success');
                             setTimeout(() => {
                                 window.location.href = '/login';

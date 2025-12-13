@@ -10,7 +10,7 @@
 
 <div class="form-container">
     <div class="logo" style="text-align: center; margin-bottom: 32px; border: none; padding: 0;">
-        yo.route {}
+        <img src="{{ url_for('static', filename='img/image.png') }}" alt="yo.route" style="height: 64px; width: auto;">
     </div>
 
     <h1 class="page-title" style="text-align: center; margin-bottom: 32px;">Регистрация</h1>
@@ -234,6 +234,11 @@
                     const result = await response.json();
 
                     if (result.success) {
+                        // Сохраняем JWT токен
+                        if (result.token) {
+                            api.setToken(result.token);
+                        }
+
                         showNotification('Компания успешно создана', 'success');
 
                         // Редирект после успешной регистрации

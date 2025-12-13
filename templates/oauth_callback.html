@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% set show_menu = False %}
+
+{% block title %}Авторизация - yo.route{% endblock %}
+
+{% block content %}
+<div class="form-container" style="text-align: center; padding: 60px 40px;">
+    <div class="logo" style="margin-bottom: 32px; border: none; padding: 0;">
+        <img src="{{ url_for('static', filename='img/image.png') }}" alt="yo.route" style="height: 64px; width: auto;">
+    </div>
+
+    {% if error %}
+    <div style="color: #ef4444; margin-bottom: 24px;">
+        <i class="fi fi-sr-exclamation" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+        <h2 style="margin-bottom: 12px;">Ошибка авторизации</h2>
+        <p>{{ error }}</p>
+        <a href="/login" class="btn btn-primary" style="margin-top: 24px; display: inline-block;">
+            Вернуться на страницу входа
+        </a>
+    </div>
+    {% else %}
+    <div style="color: var(--text-gray);">
+        <div class="loading-spinner"
+            style="width: 48px; height: 48px; border: 3px solid var(--border-color); border-top-color: var(--primary-blue); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 24px;">
+        </div>
+        <p>Выполняется вход...</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    {% if token %}
+    // Сохраняем токен в localStorage и редиректим
+    (function () {
+        const token = '{{ token }}';
+        if (token && typeof api !== 'undefined') {
+            api.setToken(token);
+        } else {
+            localStorage.setItem('auth_token', token);
+        }
+        window.location.href = '/orders';
+    })();
+    {% endif %}
+</script>
+{% endblock %}

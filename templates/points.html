@@ -514,11 +514,8 @@
 
             if (confirm(`Удалить точку "${point.address}"?`)) {
                 try {
-                    const response = await fetch(`/api/points/${point.id}`, {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    const result = await response.json();
+                    // Используем api.delete для включения JWT токена
+                    const result = await api.delete(`/api/points/${point.id}`);
                     if (result.success) {
                         showNotification('Точка успешно удалена', 'success');
                         await loadPointsList();
@@ -559,13 +556,14 @@
 
             try {
                 const url = editId ? `/api/points/${editId}` : '/api/points';
-                const method = editId ? 'PUT' : 'POST';
-                const response = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
+
+                // Используем api helper для включения JWT токена
+                let result;
+                if (editId) {
+                    result = await api.put(url, data);
+                } else {
+                    result = await api.post(url, data);
+                }
                 if (result.success) {
                     showNotification(editId ? 'Точка обновлена' : 'Точка добавлена', 'success');
                     await loadPointsList();

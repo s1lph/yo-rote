@@ -464,12 +464,13 @@
 </nav>
 
 <div id="hero" class="hero-section animate-on-scroll">
+
     <h1 class="hero-title">yo.route</h1>
     <p class="hero-subtitle">
         Интеллектуальная система маршрутизации.
         Оптимизируйте маршруты, управляйте курьерами и отслеживайте заказы в реальном времени.
     </p>
-    <a href="/login" class="cta-button">Начать работу</a>
+    <a href="/login" class="cta-button" id="cta-start">Начать работу</a>
 </div>
 
 <div class="hero-image-container animate-on-scroll">
@@ -643,7 +644,7 @@
 <div class="cta-footer animate-on-scroll">
     <h2>Готовы оптимизировать логистику?</h2>
     <p>Попробуйте yo.route бесплатно и оцените преимущества уже сегодня.</p>
-    <a href="/registration" class="cta-button">Попробовать бесплатно</a>
+    <a href="/registration" class="cta-button" id="cta-try">Попробовать бесплатно</a>
 </div>
 {% endblock %}
 
@@ -651,7 +652,10 @@
 <footer class="site-footer">
     <div class="footer-content">
         <div class="footer-info">
-            <span class="footer-logo">yo.route {}</span>
+            <span class="footer-logo" style="display: flex; align-items: center; gap: 10px;">
+                <img src="/static/img/image.png" alt="yo.route" style="height: 28px; width: auto;">
+                yo.route
+            </span>
             <p class="footer-description">Сервис оптимизации маршрутов доставки для курьерских служб</p>
         </div>
         <div class="footer-links">
@@ -772,6 +776,23 @@
             heroContainer.addEventListener('mouseenter', () => {
                 mockupWindow.style.transition = 'transform 0.1s ease'; // Fast response
             });
+        }
+
+        // Проверка авторизации для CTA кнопок
+        const ctaStart = document.getElementById('cta-start');
+        const ctaTry = document.getElementById('cta-try');
+        const token = localStorage.getItem('auth_token');
+
+        if (token) {
+            // Если есть токен, перенаправляем на /orders
+            if (ctaStart) {
+                ctaStart.href = '/orders';
+                ctaStart.textContent = 'Перейти в панель';
+            }
+            if (ctaTry) {
+                ctaTry.href = '/orders';
+                ctaTry.textContent = 'Открыть панель';
+            }
         }
     });
 </script>
