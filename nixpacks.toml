@@ -1,0 +1,6 @@
+# Указываем провайдер Python
+providers = ["python"]
+
+# Версия Python
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.11"
