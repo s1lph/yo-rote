@@ -1272,6 +1272,29 @@ async def main():
 WEBHOOK_PATH = f"/webhook/telegram/{BOT_TOKEN}"
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')  # Например: https://your-app.up.railway.app
 
+# Глобальный event loop для webhook режима
+_webhook_loop = None
+_webhook_thread = None
+
+
+def _run_async_loop(loop):
+    """Запуск event loop в отдельном потоке"""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+
+def get_webhook_loop():
+    """Получение или создание event loop для webhook"""
+    global _webhook_loop, _webhook_thread
+    
+    if _webhook_loop is None or _webhook_loop.is_closed():
+        _webhook_loop = asyncio.new_event_loop()
+        _webhook_thread = threading.Thread(target=_run_async_loop, args=(_webhook_loop,), daemon=True)
+        _webhook_thread.start()
+    
+    return _webhook_loop
+
+
 async def setup_webhook():
     """Установка webhook для Telegram"""
     if WEBHOOK_URL:
@@ -1294,11 +1317,15 @@ def init_bot_webhook(flask_app):
     Интеграция бота с Flask приложением через webhook.
     Вызывается из app.py при старте сервера.
     """
-    import asyncio
+    import threading
+    import concurrent.futures
     from flask import request, Response
     
     # Создаем директорию для фото
     ensure_proofs_dir()
+    
+    # Инициализируем постоянный event loop
+    loop = get_webhook_loop()
     
     @flask_app.route(WEBHOOK_PATH, methods=['POST'])
     def telegram_webhook():
@@ -1306,30 +1333,39 @@ def init_bot_webhook(flask_app):
         if request.headers.get('content-type') == 'application/json':
             update_data = request.get_json()
             
-            # Запускаем обработку в event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Запускаем обработку в постоянном event loop
+            future = asyncio.run_coroutine_threadsafe(
+                process_webhook_update(update_data),
+                loop
+            )
+            
             try:
-                loop.run_until_complete(process_webhook_update(update_data))
-            finally:
-                loop.close()
+                # Ждём выполнения с таймаутом 25 секунд
+                future.result(timeout=25)
+            except concurrent.futures.TimeoutError:
+                print("[WARN] Webhook update processing timeout")
+            except Exception as e:
+                print(f"[ERROR] Webhook processing error: {e}")
             
             return Response('OK', status=200)
         return Response('Bad Request', status=400)
     
-    # Устанавливаем webhook асинхронно
+    # Устанавливаем webhook
     if WEBHOOK_URL:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        future = asyncio.run_coroutine_threadsafe(setup_webhook(), loop)
         try:
-            loop.run_until_complete(setup_webhook())
-        finally:
-            loop.close()
-        print(f"🤖 Telegram бот (WEBHOOK режим) готов")
+            future.result(timeout=10)
+            print(f"🤖 Telegram бот (WEBHOOK режим) готов")
+        except Exception as e:
+            print(f"⚠️  Ошибка установки webhook: {e}")
     else:
         print("⚠️  WEBHOOK_URL не установлен, бот не активирован")
     
     return True
+
+
+# Импорт threading в начало модуля нужен
+import threading
 
 
 if __name__ == '__main__':
