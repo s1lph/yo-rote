@@ -38,3 +38,14 @@ instance/
 .DS_Store
 Thumbs.db
 
+# Environment
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+.venv/
+
