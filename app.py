@@ -20,7 +20,12 @@ app = Flask(__name__)
 CORS(app)
 
 # Конфигурация базы данных
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///logistics.db')
+# Railway использует postgres://, но SQLAlchemy требует postgresql://
+database_url = os.getenv('DATABASE_URL', 'sqlite:///logistics.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SESSION_TYPE'] = 'filesystem'
