@@ -52,13 +52,18 @@ with app.app_context():
     if 'postgresql' in database_url:
         from sqlalchemy import text
         try:
+            # User: новые поля для Telegram
             db.session.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)'))
             db.session.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_code VARCHAR(20)'))
+            
+            # Courier: увеличить auth_code с VARCHAR(6) до VARCHAR(20) для 12-символьных кодов
+            db.session.execute(text('ALTER TABLE couriers ALTER COLUMN auth_code TYPE VARCHAR(20)'))
+            
             db.session.commit()
-            print("✅ Миграция User Telegram полей выполнена")
+            print("✅ Миграции выполнены успешно")
         except Exception as e:
             db.session.rollback()
-            print(f"ℹ️  Миграция User: {e}")
+            print(f"ℹ️  Миграция: {e}")
 
 # Инициализация Telegram бота (webhook режим для production)
 if os.getenv('WEBHOOK_URL'):
