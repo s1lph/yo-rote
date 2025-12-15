@@ -68,6 +68,36 @@
                     пароль</button>
             </form>
         </div>
+
+        <div class="list-section">
+            <h2 class="section-title"><i class="fi fi-sr-paper-plane"></i> Telegram интеграция</h2>
+            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">
+                Привяжите Telegram для получения SOS-оповещений от курьеров и просмотра статистики.
+            </p>
+
+            <div id="telegram-status">
+                <!-- Статус загружается через JS -->
+            </div>
+
+            <button type="button" class="btn btn-primary" id="telegram-link-btn" style="margin-top: 12px;">
+                <i class="fi fi-sr-paper-plane"></i> Привязать Telegram
+            </button>
+
+            <div id="telegram-code-block"
+                style="display: none; margin-top: 16px; padding: 16px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px;">
+                <p style="margin: 0 0 12px 0; font-size: 14px; color: var(--text-secondary);">
+                    Откройте бота и введите код:
+                </p>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <code id="telegram-code"
+                        style="font-size: 18px; background: white; padding: 8px 16px; border-radius: 8px; font-family: monospace; letter-spacing: 1px;"></code>
+                    <a id="telegram-bot-link" href="#" target="_blank" class="btn btn-secondary"
+                        style="font-size: 13px;">
+                        Открыть бота →
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Правая колонка: Карточка профиля -->
@@ -401,6 +431,46 @@
                     } catch (error) {
                         console.error('Logout error:', error);
                         showNotification('Ошибка соединения с сервером', 'error');
+                    }
+                }
+            });
+        }
+
+        // Привязка Telegram
+        const telegramLinkBtn = document.getElementById('telegram-link-btn');
+        const telegramCodeBlock = document.getElementById('telegram-code-block');
+        const telegramCode = document.getElementById('telegram-code');
+        const telegramBotLink = document.getElementById('telegram-bot-link');
+        const telegramStatus = document.getElementById('telegram-status');
+
+        if (telegramLinkBtn) {
+            telegramLinkBtn.addEventListener('click', async function () {
+                try {
+                    telegramLinkBtn.disabled = true;
+                    telegramLinkBtn.innerHTML = '<i class="fi fi-sr-spinner"></i> Загрузка...';
+
+                    const result = await api.get('/api/account/telegram-link');
+
+                    if (result.success) {
+                        if (result.telegram_connected) {
+                            telegramStatus.innerHTML = '<span style="color: #22c55e;"><i class="fi fi-sr-check-circle"></i> Telegram уже привязан</span>';
+                            telegramLinkBtn.style.display = 'none';
+                        } else {
+                            telegramCode.textContent = result.code;
+                            telegramBotLink.href = result.link;
+                            telegramCodeBlock.style.display = 'block';
+                            telegramLinkBtn.innerHTML = '<i class="fi fi-sr-refresh"></i> Обновить код';
+                        }
+                    } else {
+                        showNotification(result.message || 'Ошибка получения кода', 'error');
+                    }
+                } catch (error) {
+                    console.error('Telegram link error:', error);
+                    showNotification('Ошибка соединения с сервером', 'error');
+                } finally {
+                    telegramLinkBtn.disabled = false;
+                    if (!telegramCodeBlock.style.display || telegramCodeBlock.style.display === 'none') {
+                        telegramLinkBtn.innerHTML = '<i class="fi fi-sr-paper-plane"></i> Привязать Telegram';
                     }
                 }
             });
