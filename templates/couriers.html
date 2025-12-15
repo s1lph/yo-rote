@@ -105,7 +105,7 @@
     </div>
 </div>
 
-<!-- Popup с инструкцией -->
+<!-- Popup с инструкцией для водителя -->
 <div class="popup" id="auth-instruction-popup">
     <div class="popup-content">
         <button class="popup-close">&times;</button>
@@ -114,13 +114,30 @@
             <li>Откройте бота: <a href="https://t.me/yoroutebot" target="_blank"
                     style="color: var(--primary-blue);">t.me/yoroutebot</a></li>
             <li>Нажмите <b>/start</b> в боте</li>
-            <li>Введите 6-значный код из таблицы курьеров</li>
+            <li>Введите 12-значный код из таблицы курьеров</li>
             <li>После привязки водитель будет получать маршруты!</li>
         </ol>
         <p style="margin-top: 16px; color: var(--text-secondary); font-size: 13px;">
             ✅ = Бот привязан &nbsp;&nbsp; ⏳ = Ожидает привязки (код активен)
         </p>
     </div>
+</div>
+
+<!-- Инструкция для администратора -->
+<div
+    style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05)); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 20px; margin: 24px 0; max-width: 600px;">
+    <h3 style="margin: 0 0 12px 0; font-size: 16px; color: var(--text-primary);">
+        🔐 Вход в админ-панель бота (для владельца)
+    </h3>
+    <ol style="padding-left: 20px; margin: 0; line-height: 1.8; color: var(--text-secondary);">
+        <li>Перейдите в <a href="/account" style="color: var(--primary-blue);">Настройки аккаунта</a></li>
+        <li>Нажмите кнопку <b>"Привязать Telegram"</b></li>
+        <li>Перейдите по ссылке и введите код в боте</li>
+        <li>Теперь вы будете получать SOS-оповещения от курьеров!</li>
+    </ol>
+    <p style="margin: 12px 0 0 0; font-size: 13px; color: var(--text-secondary);">
+        💡 После привязки вы сможете видеть статистику и получать экстренные уведомления.
+    </p>
 </div>
 {% endblock %}
 
