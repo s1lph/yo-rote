@@ -79,6 +79,12 @@ class AdminStates(StatesGroup):
     waiting_alert_message = State()      # Ожидание текста тревоги
 
 
+class OwnerStates(StatesGroup):
+    """Состояния для панели владельца"""
+    waiting_broadcast_message = State()  # Ожидание текста рассылки
+    waiting_alert_message = State()      # Ожидание текста тревоги
+
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -193,13 +199,29 @@ def get_owner_menu_keyboard() -> ReplyKeyboardMarkup:
     """
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📊 Моя статистика")],
+            [KeyboardButton(text="📊 Панель управления")],
             [KeyboardButton(text="🔗 Отвязать Telegram")]
         ],
         resize_keyboard=True,
         is_persistent=True
     )
     return keyboard
+
+
+def get_owner_panel_keyboard() -> InlineKeyboardMarkup:
+    """
+    Inline-клавиатура панели владельца.
+    
+    Returns:
+        InlineKeyboardMarkup с кнопками панели управления
+    """
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="owner:stats")],
+        [InlineKeyboardButton(text="📢 Рассылка курьерам", callback_data="owner:broadcast")],
+        [InlineKeyboardButton(text="🚨 Тревога", callback_data="owner:alert")],
+        [InlineKeyboardButton(text="📸 Фото-пруфы", callback_data="owner:proofs")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="owner:close")]
+    ])
 
 
 def generate_order_keyboard(
@@ -808,23 +830,48 @@ async def end_shift(message: Message):
 # Owner Menu Handlers (Меню владельца)
 # ============================================================================
 
-@dp.message(F.text == "📊 Моя статистика")
-async def owner_statistics(message: Message):
-    """Статистика для владельца бизнеса"""
+@dp.message(F.text == "📊 Панель управления")
+async def owner_panel(message: Message):
+    """Открыть панель управления владельца"""
     app = get_flask_app()
     with app.app_context():
-        from models import User, Courier, Order, Route
+        from models import User
         
-        # Проверяем, что это владелец
         user = User.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
         
         if not user:
             await message.answer("❌ Вы не авторизованы как владелец.")
             return
         
+        await message.answer(
+            f"🔐 *Панель управления*\n\n"
+            f"Компания: *{user.company_name or 'Не указана'}*\n\n"
+            f"Выберите действие:",
+            parse_mode="Markdown",
+            reply_markup=get_owner_panel_keyboard()
+        )
+
+
+@dp.callback_query(F.data == "owner:stats")
+async def owner_stats(callback: CallbackQuery):
+    """Показать статистику владельца"""
+    app = get_flask_app()
+    with app.app_context():
+        from models import User, Courier, Order, Route
+        
+        user = User.query.filter_by(telegram_chat_id=str(callback.message.chat.id)).first()
+        
+        if not user:
+            await callback.answer("❌ Вы не авторизованы как владелец.", show_alert=True)
+            return
+        
         # Статистика владельца
         total_couriers = Courier.query.filter_by(user_id=user.id).count()
         on_shift = Courier.query.filter_by(user_id=user.id, is_on_shift=True).count()
+        with_telegram = Courier.query.filter(
+            Courier.user_id == user.id,
+            Courier.telegram_chat_id.isnot(None)
+        ).count()
         
         # Заказы владельца
         pending_orders = Order.query.filter_by(user_id=user.id, status='planned').count()
@@ -832,14 +879,15 @@ async def owner_statistics(message: Message):
         completed = Order.query.filter_by(user_id=user.id, status='completed').count()
         failed = Order.query.filter_by(user_id=user.id, status='failed').count()
         
-        # Активные маршруты
+        # Маршруты
         active_routes = Route.query.filter_by(user_id=user.id, status='active').count()
         
         stats_text = (
             f"📊 *Статистика {user.company_name or 'вашей компании'}*\n\n"
             f"👥 *Курьеры:*\n"
             f"  • Всего: {total_couriers}\n"
-            f"  • На смене: {on_shift}\n\n"
+            f"  • На смене: {on_shift}\n"
+            f"  • С Telegram: {with_telegram}\n\n"
             f"📦 *Заказы:*\n"
             f"  • Ожидают: {pending_orders}\n"
             f"  • В работе: {in_progress}\n"
@@ -849,7 +897,230 @@ async def owner_statistics(message: Message):
             f"⏰ Обновлено: {datetime.now().strftime('%H:%M:%S')}"
         )
         
-        await message.answer(stats_text, parse_mode="Markdown")
+        await callback.message.edit_text(
+            stats_text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔄 Обновить", callback_data="owner:stats")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="owner:menu")]
+            ])
+        )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "owner:broadcast")
+async def owner_broadcast(callback: CallbackQuery, state: FSMContext):
+    """Начать рассылку курьерам"""
+    app = get_flask_app()
+    with app.app_context():
+        from models import User
+        user = User.query.filter_by(telegram_chat_id=str(callback.message.chat.id)).first()
+        if not user:
+            await callback.answer("❌ Вы не авторизованы", show_alert=True)
+            return
+        
+        await state.update_data(user_id=user.id)
+    
+    await state.set_state(OwnerStates.waiting_broadcast_message)
+    
+    await callback.message.edit_text(
+        "📢 *Рассылка курьерам*\n\n"
+        "Введите текст сообщения, которое будет отправлено вашим курьерам с привязанным Telegram.\n\n"
+        "_Поддерживается Markdown форматирование._",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="owner:cancel")]
+        ])
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "owner:alert")
+async def owner_alert(callback: CallbackQuery, state: FSMContext):
+    """Начать отправку тревоги"""
+    app = get_flask_app()
+    with app.app_context():
+        from models import User
+        user = User.query.filter_by(telegram_chat_id=str(callback.message.chat.id)).first()
+        if not user:
+            await callback.answer("❌ Вы не авторизованы", show_alert=True)
+            return
+        
+        await state.update_data(user_id=user.id)
+    
+    await state.set_state(OwnerStates.waiting_alert_message)
+    
+    await callback.message.edit_text(
+        "🚨 *ТРЕВОГА - Экстренное оповещение*\n\n"
+        "⚠️ Это сообщение будет отправлено ВСЕМ вашим курьерам на смене как срочное уведомление!\n\n"
+        "Введите текст тревоги:",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="owner:cancel")]
+        ])
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "owner:proofs")
+async def owner_proofs(callback: CallbackQuery):
+    """Показать список последних фото-пруфов владельца"""
+    app = get_flask_app()
+    with app.app_context():
+        from models import User, Order, Courier, Route
+        
+        user = User.query.filter_by(telegram_chat_id=str(callback.message.chat.id)).first()
+        if not user:
+            await callback.answer("❌ Вы не авторизованы", show_alert=True)
+            return
+        
+        # Получаем последние 10 заказов владельца с фото
+        orders_with_proofs = Order.query.filter(
+            Order.user_id == user.id,
+            Order.proof_image.isnot(None),
+            Order.status == 'completed'
+        ).order_by(Order.updated_at.desc()).limit(10).all()
+        
+        if not orders_with_proofs:
+            text = (
+                "📸 *Фото-пруфы*\n\n"
+                "📭 Пока нет завершённых заказов с фото подтверждением."
+            )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="owner:menu")]
+            ])
+            
+            await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            await callback.answer()
+            return
+        
+        # Формируем список кнопок
+        buttons = []
+        for order in orders_with_proofs:
+            courier_name = "—"
+            if order.route_id:
+                route = Route.query.get(order.route_id)
+                if route and route.courier_id:
+                    courier = Courier.query.get(route.courier_id)
+                    if courier:
+                        courier_name = courier.full_name
+            
+            date_str = order.updated_at.strftime('%d.%m %H:%M') if order.updated_at else "—"
+            button_text = f"📦 {order.order_name[:20]} | {courier_name[:15]} | {date_str}"
+            buttons.append([InlineKeyboardButton(text=button_text, callback_data=f"ownerproof:{order.id}")])
+        
+        buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="owner:menu")])
+        
+        text = (
+            "📸 *Фото-пруфы*\n\n"
+            "Последние 10 подтверждений доставки.\n"
+            "Нажмите на заказ, чтобы увидеть фото:"
+        )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        
+        await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("ownerproof:"))
+async def view_owner_proof(callback: CallbackQuery):
+    """Показать фото-пруф конкретного заказа"""
+    order_id = int(callback.data.split(":")[1])
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import User, Order, Courier, Route
+        
+        user = User.query.filter_by(telegram_chat_id=str(callback.message.chat.id)).first()
+        if not user:
+            await callback.answer("❌ Вы не авторизованы", show_alert=True)
+            return
+        
+        order = Order.query.get(order_id)
+        
+        if not order or not order.proof_image or order.user_id != user.id:
+            await callback.answer("❌ Фото не найдено", show_alert=True)
+            return
+        
+        photo_path = os.path.join(os.path.dirname(__file__), 'static', order.proof_image)
+        
+        if not os.path.exists(photo_path):
+            await callback.answer("❌ Файл фото не найден на сервере", show_alert=True)
+            return
+        
+        courier_name = "—"
+        if order.route_id:
+            route = Route.query.get(order.route_id)
+            if route and route.courier_id:
+                courier = Courier.query.get(route.courier_id)
+                if courier:
+                    courier_name = courier.full_name
+        
+        caption = (
+            f"📦 *{order.order_name}*\n\n"
+            f"📍 Адрес: {order.address or '—'}\n"
+            f"👤 Получатель: {order.recipient_name or '—'}\n"
+            f"🚗 Курьер: {courier_name}\n"
+            f"⏰ Доставлено: {order.updated_at.strftime('%d.%m.%Y %H:%M') if order.updated_at else '—'}"
+        )
+        
+        photo = FSInputFile(photo_path)
+        await callback.message.answer_photo(
+            photo=photo,
+            caption=caption,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📸 Все пруфы", callback_data="owner:proofs")],
+                [InlineKeyboardButton(text="◀️ Меню", callback_data="owner:menu")]
+            ])
+        )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "owner:menu")
+async def owner_menu(callback: CallbackQuery, state: FSMContext):
+    """Вернуться в меню панели владельца"""
+    await state.clear()
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import User
+        user = User.query.filter_by(telegram_chat_id=str(callback.message.chat.id)).first()
+        company = user.company_name if user else "—"
+    
+    if callback.message.photo:
+        await callback.message.answer(
+            f"🔐 *Панель управления*\n\nКомпания: *{company}*\n\nВыберите действие:",
+            parse_mode="Markdown",
+            reply_markup=get_owner_panel_keyboard()
+        )
+    else:
+        await callback.message.edit_text(
+            f"🔐 *Панель управления*\n\nКомпания: *{company}*\n\nВыберите действие:",
+            parse_mode="Markdown",
+            reply_markup=get_owner_panel_keyboard()
+        )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "owner:cancel")
+async def owner_cancel(callback: CallbackQuery, state: FSMContext):
+    """Отмена действия"""
+    await state.clear()
+    await callback.message.edit_text(
+        "🔐 *Панель управления*\n\nДействие отменено. Выберите следующее действие:",
+        parse_mode="Markdown",
+        reply_markup=get_owner_panel_keyboard()
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "owner:close")
+async def owner_close(callback: CallbackQuery, state: FSMContext):
+    """Закрыть панель владельца"""
+    await state.clear()
+    await callback.message.delete()
+    await callback.answer("Панель закрыта")
 
 
 @dp.message(F.text == "🔗 Отвязать Telegram")
@@ -874,6 +1145,109 @@ async def owner_unlink_telegram(message: Message):
             "Для повторной привязки используйте код из личного кабинета yo.route.",
             parse_mode="Markdown"
         )
+
+
+# ============================================================================
+# Owner Message Handlers (FSM)
+# ============================================================================
+
+@dp.message(OwnerStates.waiting_broadcast_message, F.text)
+async def process_owner_broadcast(message: Message, state: FSMContext):
+    """Обработка и отправка рассылки от владельца только своим курьерам"""
+    data = await state.get_data()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        await state.clear()
+        return
+    
+    broadcast_text = message.text.strip()
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Courier
+        
+        # Получаем только курьеров этого владельца
+        couriers = Courier.query.filter(
+            Courier.user_id == user_id,
+            Courier.telegram_chat_id.isnot(None)
+        ).all()
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for courier in couriers:
+            try:
+                await bot.send_message(
+                    chat_id=courier.telegram_chat_id,
+                    text=f"📢 *Сообщение от диспетчера*\n\n{broadcast_text}",
+                    parse_mode="Markdown"
+                )
+                sent_count += 1
+            except Exception as e:
+                print(f"[ERROR] Failed to send broadcast to {courier.full_name}: {e}")
+                failed_count += 1
+    
+    await message.answer(
+        f"✅ *Рассылка завершена!*\n\n"
+        f"📤 Отправлено: {sent_count}\n"
+        f"❌ Ошибок: {failed_count}",
+        parse_mode="Markdown",
+        reply_markup=get_owner_panel_keyboard()
+    )
+    await state.clear()
+
+
+@dp.message(OwnerStates.waiting_alert_message, F.text)
+async def process_owner_alert(message: Message, state: FSMContext):
+    """Обработка и отправка тревоги от владельца только своим курьерам на смене"""
+    data = await state.get_data()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        await state.clear()
+        return
+    
+    alert_text = message.text.strip()
+    
+    app = get_flask_app()
+    with app.app_context():
+        from models import Courier
+        
+        # Получаем только курьеров этого владельца на смене
+        couriers = Courier.query.filter(
+            Courier.user_id == user_id,
+            Courier.telegram_chat_id.isnot(None),
+            Courier.is_on_shift == True
+        ).all()
+        
+        sent_count = 0
+        failed_count = 0
+        
+        for courier in couriers:
+            try:
+                await bot.send_message(
+                    chat_id=courier.telegram_chat_id,
+                    text=f"🚨🚨🚨 *ТРЕВОГА!* 🚨🚨🚨\n\n{alert_text}\n\n"
+                         f"_Срочное сообщение от диспетчера_",
+                    parse_mode="Markdown"
+                )
+                sent_count += 1
+            except Exception as e:
+                print(f"[ERROR] Failed to send alert to {courier.full_name}: {e}")
+                failed_count += 1
+    
+    await message.answer(
+        f"🚨 *Тревога отправлена!*\n\n"
+        f"📤 Получили: {sent_count} курьеров на смене\n"
+        f"❌ Ошибок: {failed_count}",
+        parse_mode="Markdown",
+        reply_markup=get_owner_panel_keyboard()
+    )
+    await state.clear()
+
+
+# ============================================================================
 # Live Location Tracking
 # ============================================================================
 
@@ -1281,7 +1655,7 @@ async def handle_auth_code(message: Message):
     # Игнорируем команды меню
     menu_commands = [
         "📍 Начал смену", "🏁 Закончил смену", "📋 Мои заказы", "🆘 Проблема",
-        "📊 Моя статистика", "🔗 Отвязать Telegram", "🔐 Админ-панель"
+        "📊 Панель управления", "🔗 Отвязать Telegram", "🔐 Админ-панель"
     ]
     if message.text in menu_commands:
         return
