@@ -184,6 +184,24 @@ def get_main_menu_keyboard(is_on_shift: bool = False, user_id: int = None) -> Re
     return keyboard
 
 
+def get_owner_menu_keyboard() -> ReplyKeyboardMarkup:
+    """
+    Меню владельца бизнеса (Reply Keyboard).
+    
+    Returns:
+        ReplyKeyboardMarkup с кнопками меню владельца
+    """
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📊 Моя статистика")],
+            [KeyboardButton(text="🔗 Отвязать Telegram")]
+        ],
+        resize_keyboard=True,
+        is_persistent=True
+    )
+    return keyboard
+
+
 def generate_order_keyboard(
     order_id: int, 
     lat: Optional[float] = None, 
@@ -787,6 +805,75 @@ async def end_shift(message: Message):
 
 
 # ============================================================================
+# Owner Menu Handlers (Меню владельца)
+# ============================================================================
+
+@dp.message(F.text == "📊 Моя статистика")
+async def owner_statistics(message: Message):
+    """Статистика для владельца бизнеса"""
+    app = get_flask_app()
+    with app.app_context():
+        from models import User, Courier, Order, Route
+        
+        # Проверяем, что это владелец
+        user = User.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
+        
+        if not user:
+            await message.answer("❌ Вы не авторизованы как владелец.")
+            return
+        
+        # Статистика владельца
+        total_couriers = Courier.query.filter_by(user_id=user.id).count()
+        on_shift = Courier.query.filter_by(user_id=user.id, is_on_shift=True).count()
+        
+        # Заказы владельца
+        pending_orders = Order.query.filter_by(user_id=user.id, status='planned').count()
+        in_progress = Order.query.filter_by(user_id=user.id, status='in_progress').count()
+        completed = Order.query.filter_by(user_id=user.id, status='completed').count()
+        failed = Order.query.filter_by(user_id=user.id, status='failed').count()
+        
+        # Активные маршруты
+        active_routes = Route.query.filter_by(user_id=user.id, status='active').count()
+        
+        stats_text = (
+            f"📊 *Статистика {user.company_name or 'вашей компании'}*\n\n"
+            f"👥 *Курьеры:*\n"
+            f"  • Всего: {total_couriers}\n"
+            f"  • На смене: {on_shift}\n\n"
+            f"📦 *Заказы:*\n"
+            f"  • Ожидают: {pending_orders}\n"
+            f"  • В работе: {in_progress}\n"
+            f"  • Доставлено: {completed}\n"
+            f"  • Отказы: {failed}\n\n"
+            f"🚗 *Активные маршруты:* {active_routes}\n\n"
+            f"⏰ Обновлено: {datetime.now().strftime('%H:%M:%S')}"
+        )
+        
+        await message.answer(stats_text, parse_mode="Markdown")
+
+
+@dp.message(F.text == "🔗 Отвязать Telegram")
+async def owner_unlink_telegram(message: Message):
+    """Отвязка Telegram от аккаунта владельца"""
+    app = get_flask_app()
+    with app.app_context():
+        from models import db, User
+        
+        user = User.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
+        
+        if not user:
+            await message.answer("❌ Вы не авторизованы как владелец.")
+            return
+        
+        user.telegram_chat_id = None
+        db.session.commit()
+        
+        await message.answer(
+            "✅ *Telegram успешно отвязан от аккаунта.*\n\n"
+            "Вы больше не будете получать уведомления.\n"
+            "Для повторной привязки используйте код из личного кабинета yo.route.",
+            parse_mode="Markdown"
+        )
 # Live Location Tracking
 # ============================================================================
 
@@ -838,7 +925,7 @@ async def handle_location_update(message: Message):
 
 @dp.message(F.text == "🆘 Проблема")
 async def emergency_button(message: Message):
-    """Тревожная кнопка - уведомление администраторам"""
+    """Тревожная кнопка - уведомление владельцу бизнеса (через courier.user)"""
     app = get_flask_app()
     with app.app_context():
         from models import Courier
@@ -848,13 +935,13 @@ async def emergency_button(message: Message):
             await message.answer("❌ Вы не авторизованы в системе.")
             return
         
-        # Формируем сообщение для администратора
+        # Формируем сообщение для владельца
         location_info = ""
         if courier.current_lat and courier.current_lon:
             maps_link = f"https://yandex.ru/maps/?pt={courier.current_lon},{courier.current_lat}&z=17"
             location_info = f"\n📍 [Местоположение]({maps_link})"
         
-        admin_message = (
+        alert_message = (
             f"🆘 *ТРЕВОГА! Водитель сообщает о проблеме!*\n\n"
             f"👤 *Курьер:* {courier.full_name}\n"
             f"📞 *Телефон:* {courier.phone or 'не указан'}\n"
@@ -863,29 +950,35 @@ async def emergency_button(message: Message):
             f"⏰ Время: {datetime.now().strftime('%H:%M:%S %d.%m.%Y')}"
         )
         
-        # Отправляем всем администраторам
-        sent_count = 0
-        for admin_id in ADMIN_IDS:
+        # Получаем владельца курьера через relationship
+        owner = courier.user
+        
+        if owner and owner.telegram_chat_id:
+            # Отправляем владельцу
             try:
                 await bot.send_message(
-                    chat_id=admin_id,
-                    text=admin_message,
+                    chat_id=owner.telegram_chat_id,
+                    text=alert_message,
                     parse_mode="Markdown"
                 )
-                sent_count += 1
+                await message.answer(
+                    "✅ *Сообщение отправлено вашему диспетчеру!*\n\n"
+                    "Ожидайте, с вами свяжутся в ближайшее время.",
+                    parse_mode="Markdown"
+                )
             except Exception as e:
-                print(f"[ERROR] Failed to send emergency to admin {admin_id}: {e}")
-        
-        if sent_count > 0:
-            await message.answer(
-                "✅ *Сообщение отправлено диспетчеру!*\n\n"
-                "Ожидайте, с вами свяжутся в ближайшее время.",
-                parse_mode="Markdown"
-            )
+                print(f"[ERROR] Failed to send emergency to owner {owner.id}: {e}")
+                await message.answer(
+                    "⚠️ Не удалось отправить сообщение диспетчеру.\n"
+                    "Пожалуйста, позвоните по телефону поддержки.",
+                    parse_mode="Markdown"
+                )
         else:
+            # Владелец не привязал Telegram
             await message.answer(
-                "⚠️ Не удалось отправить сообщение диспетчеру.\n"
-                "Пожалуйста, позвоните по телефону поддержки.",
+                "⚠️ *Ваш диспетчер не привязал Telegram.*\n\n"
+                "Пожалуйста, свяжитесь с ним по телефону или сообщите о необходимости "
+                "привязать Telegram в личном кабинете yo.route.",
                 parse_mode="Markdown"
             )
 
@@ -1184,20 +1277,25 @@ async def process_failure_reason(message: Message, state: FSMContext):
 
 @dp.message(F.text)
 async def handle_auth_code(message: Message):
-    """Обработчик текстовых сообщений (код авторизации)"""
+    """Обработчик текстовых сообщений (код авторизации для User или Courier)"""
     # Игнорируем команды меню
-    menu_commands = ["📍 Начал смену", "🏁 Закончил смену", "📋 Мои заказы", "🆘 Проблема"]
+    menu_commands = [
+        "📍 Начал смену", "🏁 Закончил смену", "📋 Мои заказы", "🆘 Проблема",
+        "📊 Моя статистика", "🔗 Отвязать Telegram", "🔐 Админ-панель"
+    ]
     if message.text in menu_commands:
         return
     
-    code = message.text.strip().upper()
+    code = message.text.strip()
     
-    # Проверяем формат кода (6 символов, буквы и цифры)
-    if len(code) != 6 or not code.isalnum():
+    # Проверяем формат кода (12 символов, буквы, цифры, спецсимволы)
+    # Разрешаем буквы, цифры и символы !@#$%&*?
+    import re
+    if len(code) != 12 or not re.match(r'^[A-Za-z0-9!@#$%&*?]+$', code):
         await message.answer(
             "❌ Неверный формат кода.\n"
-            "Код должен состоять из 6 символов (буквы A-Z и цифры 0-9).\n\n"
-            "Пример: ABC123"
+            "Код должен состоять из 12 символов (буквы, цифры и символы !@#$%&*?).\n\n"
+            "Получите код в личном кабинете yo.route."
         )
         return
     
@@ -1205,20 +1303,48 @@ async def handle_auth_code(message: Message):
     app = get_flask_app()
     
     with app.app_context():
-        from models import db, Courier
+        from models import db, User, Courier
         
-        # Проверяем, не привязан ли уже этот chat_id
-        existing = Courier.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
-        if existing:
+        # Проверяем, не привязан ли уже этот chat_id как Владелец
+        existing_user = User.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
+        if existing_user:
             await message.answer(
-                f"ℹ️ Вы уже авторизованы как *{existing.full_name}*\n\n"
-                f"Используйте /menu для открытия главного меню.",
+                f"ℹ️ Вы уже авторизованы как владелец *{existing_user.company_name or existing_user.email}*\n\n"
+                f"Используйте меню ниже.",
                 parse_mode="Markdown",
-                reply_markup=get_main_menu_keyboard(existing.is_on_shift)
+                reply_markup=get_owner_menu_keyboard()
             )
             return
         
-        # Ищем курьера по коду
+        # Проверяем, не привязан ли уже этот chat_id как Курьер
+        existing_courier = Courier.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
+        if existing_courier:
+            await message.answer(
+                f"ℹ️ Вы уже авторизованы как *{existing_courier.full_name}*\n\n"
+                f"Используйте /menu для открытия главного меню.",
+                parse_mode="Markdown",
+                reply_markup=get_main_menu_keyboard(existing_courier.is_on_shift, message.from_user.id)
+            )
+            return
+        
+        # Сначала ищем код в User (Владелец бизнеса)
+        user = User.query.filter_by(auth_code=code).first()
+        if user:
+            user.telegram_chat_id = str(message.chat.id)
+            user.auth_code = None  # Очищаем код после использования
+            db.session.commit()
+            
+            await message.answer(
+                f"✅ *Добро пожаловать, {user.company_name or 'Владелец'}!*\n\n"
+                f"Вы успешно привязали Telegram к аккаунту.\n"
+                f"Теперь вы будете получать уведомления от ваших курьеров.\n\n"
+                f"Используйте меню ниже для управления.",
+                parse_mode="Markdown",
+                reply_markup=get_owner_menu_keyboard()
+            )
+            return
+        
+        # Если не найден в User, ищем в Courier
         courier = Courier.query.filter_by(auth_code=code).first()
         
         if not courier:
@@ -1229,7 +1355,7 @@ async def handle_auth_code(message: Message):
             )
             return
         
-        # Сохраняем chat_id
+        # Сохраняем chat_id для курьера
         courier.telegram_chat_id = str(message.chat.id)
         # Очищаем код после успешной привязки
         courier.auth_code = None

@@ -2275,6 +2275,54 @@ def api_account_security():
     
     return jsonify({'success': True, 'message': 'Пароль успешно обновлен'})
 
+
+@app.route('/api/account/telegram-link', methods=['GET'])
+def api_account_telegram_link():
+    """
+    GET /api/account/telegram-link - Генерация ссылки для привязки Telegram
+    
+    Требует аутентификации (токен в заголовке Authorization)
+    
+    Возвращает:
+    {
+        "success": true,
+        "link": "https://t.me/yoroutebot?start=COMPLEX_CODE",
+        "code": "COMPLEX_CODE",
+        "telegram_connected": false
+    }
+    """
+    # Получаем текущего пользователя из JWT
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'Пользователь не найден'}), 404
+    
+    # Проверяем, привязан ли уже Telegram
+    if user.telegram_chat_id:
+        return jsonify({
+            'success': True,
+            'telegram_connected': True,
+            'message': 'Telegram уже привязан к аккаунту'
+        })
+    
+    # Генерируем новый код авторизации
+    code = user.generate_auth_code(force=True)
+    db.session.commit()
+    
+    # Получаем имя бота из переменных окружения
+    bot_name = os.getenv('TG_BOT_NAME', 'yoroutebot')
+    link = f"https://t.me/{bot_name}?start={code}"
+    
+    return jsonify({
+        'success': True,
+        'link': link,
+        'code': code,
+        'telegram_connected': False
+    })
+
 # ============================================
 # USER API - Работа с пользователем
 # ============================================

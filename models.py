@@ -23,6 +23,10 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Telegram интеграция для владельца
+    telegram_chat_id = db.Column(db.String(50), nullable=True)  # ID чата Telegram владельца
+    auth_code = db.Column(db.String(20), unique=True, nullable=True)  # Код авторизации для бота
+    
     # Relationships
     couriers = db.relationship('Courier', backref='user', lazy=True, cascade='all, delete-orphan')
     orders = db.relationship('Order', backref='user', lazy=True, cascade='all, delete-orphan')
@@ -36,6 +40,40 @@ class User(db.Model):
         """Проверка пароля"""
         return check_password_hash(self.password_hash, password)
     
+    def generate_auth_code(self, force=False):
+        """
+        Генерация 12-значного кода авторизации для Telegram-бота.
+        Код содержит буквы, цифры и спецсимволы.
+        
+        Args:
+            force: Если True, генерирует новый код даже если старый существует
+        """
+        import random
+        import string
+        
+        if self.auth_code and not force:
+            return self.auth_code
+        
+        # Генерируем уникальный код
+        chars = string.ascii_letters + string.digits + "!@#$%&*?"
+        max_attempts = 10
+        
+        for _ in range(max_attempts):
+            code = ''.join(random.choice(chars) for _ in range(12))
+            # Проверяем уникальность среди User и Courier
+            existing_user = User.query.filter_by(auth_code=code).first()
+            from models import Courier
+            existing_courier = Courier.query.filter_by(auth_code=code).first()
+            if (not existing_user or existing_user.id == self.id) and not existing_courier:
+                self.auth_code = code
+                return code
+        
+        # Fallback с timestamp
+        import time
+        code = ''.join(random.choice(chars) for _ in range(10)) + str(int(time.time()) % 100).zfill(2)
+        self.auth_code = code
+        return code
+    
     def to_dict(self):
         """Сериализация в словарь для JSON (без пароля)"""
         return {
@@ -44,6 +82,8 @@ class User(db.Model):
             'company_name': self.company_name,
             'activity': self.activity,
             'phone': self.phone,
+            'telegram_chat_id': self.telegram_chat_id,
+            'telegram_connected': bool(self.telegram_chat_id),
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
     
@@ -94,8 +134,8 @@ class Courier(db.Model):
     
     def generate_auth_code(self, force=False):
         """
-        Генерация 6-значного кода авторизации для Telegram-бота.
-        Код генерируется из символов A-Z и 0-9.
+        Генерация 12-значного кода авторизации для Telegram-бота.
+        Код содержит буквы, цифры и спецсимволы.
         
         Args:
             force: Если True, генерирует новый код даже если старый существует
@@ -107,20 +147,22 @@ class Courier(db.Model):
             return self.auth_code
         
         # Генерируем уникальный код
-        chars = string.ascii_uppercase + string.digits
+        chars = string.ascii_letters + string.digits + "!@#$%&*?"
         max_attempts = 10
         
         for _ in range(max_attempts):
-            code = ''.join(random.choices(chars, k=6))
-            # Проверяем уникальность
-            existing = Courier.query.filter_by(auth_code=code).first()
-            if not existing or existing.id == self.id:
+            code = ''.join(random.choice(chars) for _ in range(12))
+            # Проверяем уникальность среди User и Courier
+            from models import User
+            existing_user = User.query.filter_by(auth_code=code).first()
+            existing_courier = Courier.query.filter_by(auth_code=code).first()
+            if not existing_user and (not existing_courier or existing_courier.id == self.id):
                 self.auth_code = code
                 return code
         
-        # Если не удалось за 10 попыток, используем timestamp
+        # Fallback с timestamp
         import time
-        code = ''.join(random.choices(chars, k=4)) + str(int(time.time()) % 100).zfill(2)
+        code = ''.join(random.choice(chars) for _ in range(10)) + str(int(time.time()) % 100).zfill(2)
         self.auth_code = code
         return code
     
