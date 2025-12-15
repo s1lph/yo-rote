@@ -47,6 +47,18 @@ oauth.register(
 with app.app_context():
     db.create_all()
     print("✅ База данных инициализирована")
+    
+    # Миграция: добавление новых полей для Telegram интеграции User
+    if 'postgresql' in database_url:
+        from sqlalchemy import text
+        try:
+            db.session.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)'))
+            db.session.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_code VARCHAR(20)'))
+            db.session.commit()
+            print("✅ Миграция User Telegram полей выполнена")
+        except Exception as e:
+            db.session.rollback()
+            print(f"ℹ️  Миграция User: {e}")
 
 # Инициализация Telegram бота (webhook режим для production)
 if os.getenv('WEBHOOK_URL'):
