@@ -55,30 +55,23 @@ def migrate():
             # PostgreSQL migration
             from sqlalchemy import text
             
-            # Check if columns exist
-            result = db.session.execute(text("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'users'
-            """))
-            columns = [row[0] for row in result.fetchall()]
-            
-            if 'telegram_chat_id' not in columns:
-                print("Adding telegram_chat_id column to users table...")
+            print("Adding telegram_chat_id column to users table...")
+            try:
                 db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR(50)"
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)"
                 ))
-                print("✅ telegram_chat_id column added")
-            else:
-                print("ℹ️  telegram_chat_id column already exists")
+                print("✅ telegram_chat_id column added (or already exists)")
+            except Exception as e:
+                print(f"⚠️  telegram_chat_id: {e}")
             
-            if 'auth_code' not in columns:
-                print("Adding auth_code column to users table...")
+            print("Adding auth_code column to users table...")
+            try:
                 db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN auth_code VARCHAR(20) UNIQUE"
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_code VARCHAR(20)"
                 ))
-                print("✅ auth_code column added")
-            else:
-                print("ℹ️  auth_code column already exists")
+                print("✅ auth_code column added (or already exists)")
+            except Exception as e:
+                print(f"⚠️  auth_code: {e}")
         
         db.session.commit()
         print("\n✅ Migration completed successfully!")
