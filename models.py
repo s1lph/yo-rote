@@ -152,11 +152,9 @@ class Courier(db.Model):
         
         for _ in range(max_attempts):
             code = ''.join(random.choice(chars) for _ in range(12))
-            # Проверяем уникальность среди User и Courier
-            from models import User
-            existing_user = User.query.filter_by(auth_code=code).first()
+            # Проверяем уникальность среди Courier (User проверяется отдельно)
             existing_courier = Courier.query.filter_by(auth_code=code).first()
-            if not existing_user and (not existing_courier or existing_courier.id == self.id):
+            if not existing_courier or existing_courier.id == self.id:
                 self.auth_code = code
                 return code
         
