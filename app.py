@@ -892,8 +892,6 @@ def api_orders_batch():
             "message": "Заказы обновлены"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Массовое обновление заказов в БД
         data = request.json
         ids = data.get('ids', [])
         return jsonify({
@@ -1039,7 +1037,6 @@ def api_courier_assignments():
     }
     """
     if request.method == 'GET':
-        # TODO: Получение назначений из БД с учетом фильтров
         return jsonify({'assignments': []})
     else:
         """
@@ -1061,9 +1058,6 @@ def api_courier_assignments():
         }
         """
         data = request.json
-        # TODO: Проверка что заказ и курьер существуют
-        # TODO: Проверка что заказ не закреплен за другим активным курьером
-        # TODO: Сохранение назначения в БД
         return jsonify({'success': True, 'id': 1, 'message': 'Заказ закреплен за курьером'})
 
 @app.route('/api/courier-assignments/<int:assignment_id>', methods=['PUT', 'DELETE'])
@@ -1085,7 +1079,6 @@ def api_courier_assignment(assignment_id):
         }
         """
         data = request.json
-        # TODO: Обновление назначения (смена статуса, завершение маршрута и т.д.)
         return jsonify({'success': True, 'message': 'Назначение обновлено'})
     else:
         """
@@ -1097,7 +1090,6 @@ def api_courier_assignment(assignment_id):
             "message": "Назначение удалено"
         }
         """
-        # TODO: Удаление записи назначения (или пометка как отменено)
         return jsonify({'success': True, 'message': 'Назначение удалено'})
 
 # ============================================
@@ -2120,7 +2112,6 @@ def api_settings():
     }
     """
     if request.method == 'GET':
-        # TODO: Получение настроек из БД для текущего пользователя
         return jsonify({
             'settings': {
                 'theme': 'light',
@@ -2147,8 +2138,6 @@ def api_settings():
             "message": "Настройки обновлены"
         }
         """
-        # TODO: Валидация данных
-        # TODO: Обновление настроек в БД
         data = request.json
         return jsonify({'success': True, 'message': 'Настройки обновлены'})
 
@@ -2362,8 +2351,6 @@ def api_user():
     }
     """
     if request.method == 'GET':
-        # TODO: Проверка токена аутентификации
-        # TODO: Получение данных пользователя из БД
         return jsonify({
             'id': 1,
             'email': '',
@@ -2389,9 +2376,6 @@ def api_user():
             "message": "Данные обновлены"
         }
         """
-        # TODO: Проверка токена аутентификации
-        # TODO: Валидация данных
-        # TODO: Обновление данных пользователя в БД
         data = request.json
         return jsonify({'success': True, 'message': 'Данные обновлены'})
 if __name__ == '__main__':

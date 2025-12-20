@@ -8,11 +8,11 @@
     <div class="page-header">
         <h1 class="page-title">Общие настройки</h1>
     </div>
-    
+
     <form action="/api/settings" method="POST" data-method="PUT">
         <div class="list-section">
             <h2 class="section-title">Внешний вид</h2>
-            
+
             <div class="form-group">
                 <label class="form-label" for="theme">Тема оформления</label>
                 <select id="theme" name="theme" class="form-select">
@@ -21,10 +21,10 @@
                 </select>
             </div>
         </div>
-        
+
         <div class="list-section">
             <h2 class="section-title">Рабочее пространство</h2>
-            
+
             <div class="form-group">
                 <label class="form-label" for="default_page">Стартовая вкладка</label>
                 <select id="default_page" name="default_page" class="form-select">
@@ -33,7 +33,7 @@
                     <option value="points">Точки отправки</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label" for="planning_mode">Планирование маршрутов</label>
                 <select id="planning_mode" name="planning_mode" class="form-select">
@@ -41,7 +41,7 @@
                     <option value="smart">Автоматически собирать предложения</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label" for="courier_notifications">Уведомления курьерам</label>
                 <select id="courier_notifications" name="courier_notifications" class="form-select">
@@ -50,7 +50,7 @@
                 </select>
             </div>
         </div>
-        
+
         <button type="submit" class="btn btn-primary">Сохранить</button>
     </form>
 </div>
@@ -76,7 +76,6 @@
 
         try {
             const settingsData = await api.get('/api/settings');
-            // TODO: Заполнить форму данными настроек
             if (settingsData.settings) {
                 if (defaultPageSelect) {
                     defaultPageSelect.value = settingsData.settings.default_page || 'orders';
@@ -96,8 +95,7 @@
             console.error('Error loading settings:', error);
         }
     });
-    
+
     // Используем глобальную функцию applyTheme из main.js
 </script>
 {% endblock %}
-

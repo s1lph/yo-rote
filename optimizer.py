@@ -1,7 +1,4 @@
-"""
-yo.route - Route Optimization Module
-Модуль оптимизации маршрутов с использованием OpenRouteService API (VRP)
-"""
+
 
 import os
 import openrouteservice
@@ -22,26 +19,6 @@ else:
 
 
 def solve_vrp(orders, couriers, depot=None):
-    """
-    Решает задачу маршрутизации (VRP): распределяет заказы по курьерам.
-    
-    Args:
-        orders (list): Список объектов Order (SQLAlchemy models)
-        couriers (list): Список объектов Courier (SQLAlchemy models)
-        depot (dict): Координаты точки отправки {'lat': float, 'lon': float}
-        
-    Returns:
-        list: Список словарей с результатами для каждого маршрута:
-        [
-            {
-                'courier_id': int,
-                'geometry': str (encoded polyline),
-                'order_ids': list[int] (в порядке посещения),
-                'summary': dict (distance, duration)
-            },
-            ...
-        ]
-    """
     if not client:
         print("❌ ORS клиент не готов")
         return []
@@ -49,17 +26,16 @@ def solve_vrp(orders, couriers, depot=None):
     if not orders or not couriers:
         return []
 
-    # Координаты депо (точки отправки)
+ 
     if depot and depot.get('lat') and depot.get('lon'):
-        depot_coords = [depot['lon'], depot['lat']]  # ORS использует [lon, lat]
+        depot_coords = [depot['lon'], depot['lat']] 
     else:
-        # Дефолт: Москва
         depot_coords = [37.6173, 55.7558]
         print("⚠️ Депо не указано, используется Москва по умолчанию")
 
     # 1. Подготовка Jobs (Заказов)
     jobs = []
-    valid_orders_map = {}  # id -> order object
+    valid_orders_map = {}
 
     for order in orders:
         if not order.lat or not order.lon:

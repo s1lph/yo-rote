@@ -1,14 +1,4 @@
-"""
-yo.route - Advanced Telegram Bot для водителей
-Полноценное рабочее место водителя с функциями:
-- Интерактивные статусы заказов
-- Умная навигация (Deep Links)
-- Фото-отчеты (Proof of Delivery)
-- Live-трекинг курьера
-- Тревожная кнопка
 
-Использование aiogram 3.x
-"""
 
 import asyncio
 import os
