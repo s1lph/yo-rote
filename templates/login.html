@@ -4,16 +4,16 @@
 {% block title %}Вход - yo.route{% endblock %}
 
 {% block content %}
-<div id="welcome-text" class="welcome-text-container" style="text-align: center; margin-bottom: 40px;">
+<div id="welcome-text" class="welcome-text-container" style="text-align: center; margin-bottom: 24px;">
     <div id="text-type" class="text-type"></div>
 </div>
 
 <div class="form-container">
-    <div class="logo" style="text-align: center; margin-bottom: 32px; border: none; padding: 0;">
+    <div class="logo" style="text-align: center; margin-bottom: 20px; border: none; padding: 0;">
         <img src="{{ url_for('static', filename='img/image.png') }}" alt="yo.route" style="height: 64px; width: auto;">
     </div>
 
-    <h1 class="page-title" style="text-align: center; margin-bottom: 32px;">Вход</h1>
+    <h1 class="page-title" style="text-align: center; margin-bottom: 20px;">Вход</h1>
 
     <form action="/api/login" method="POST" data-redirect="/orders" id="login-form">
         <div class="form-group">
@@ -37,7 +37,7 @@
         <button type="submit" class="btn btn-primary">Войти</button>
 
         <div
-            style="text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+            style="text-align: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
             <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 12px;">
                 Нет аккаунта?
             </p>
@@ -48,7 +48,7 @@
         </div>
 
         <!-- Google OAuth Button -->
-        <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
             <p style="color: var(--text-gray); font-size: 14px; margin-bottom: 16px; text-align: center;">
                 Или войдите через
             </p>
