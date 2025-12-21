@@ -819,8 +819,25 @@
                 // Заполняем также селектор обязательной машины
                 const requiredCourierSelect = document.getElementById('required_courier_id');
                 if (requiredCourierSelect) {
+                    const vehicleIcons = {
+                        'car': '🚗',
+                        'truck': '🚛',
+                        'bicycle': '🚲',
+                        'scooter': '🛵',
+                        'walk': '🚶'
+                    };
                     requiredCourierSelect.innerHTML = '<option value="">Любая (авто-распределение)</option>' +
-                        couriers.map(courier => `<option value="${courier.id}">${courier.full_name}</option>`).join('');
+                        couriers.map(courier => {
+                            const icon = vehicleIcons[courier.vehicle_type] || '🚗';
+                            const typeName = {
+                                'car': 'Легковая',
+                                'truck': 'Грузовая',
+                                'bicycle': 'Велосипед',
+                                'scooter': 'Самокат',
+                                'walk': 'Пешком'
+                            }[courier.vehicle_type] || 'Автомобиль';
+                            return `<option value="${courier.id}">${icon} ${typeName} (${courier.full_name})</option>`;
+                        }).join('');
                 }
             } catch (error) {
                 console.error('Error loading couriers:', error);
