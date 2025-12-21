@@ -15,5 +15,19 @@ with app.app_context():
     db.session.execute(text('ALTER TABLE orders ADD COLUMN IF NOT EXISTS time_window_start VARCHAR(5)'))
     db.session.execute(text('ALTER TABLE orders ADD COLUMN IF NOT EXISTS time_window_end VARCHAR(5)'))
     
+    # Create user_settings table if not exists
+    db.session.execute(text('''
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER UNIQUE NOT NULL REFERENCES users(id),
+            theme VARCHAR(20) DEFAULT 'light',
+            default_page VARCHAR(50) DEFAULT 'orders',
+            planning_mode VARCHAR(20) DEFAULT 'manual',
+            courier_notifications VARCHAR(10) DEFAULT 'off',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    '''))
+    
     db.session.commit()
-    print("Done! All columns added successfully.")
+    print("Done! All tables and columns created successfully.")

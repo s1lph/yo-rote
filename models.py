@@ -91,6 +91,40 @@ class User(db.Model):
         return f'<User {self.email}>'
 
 
+class UserSettings(db.Model):
+    """Настройки рабочего пространства пользователя"""
+    __tablename__ = 'user_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    
+    # Внешний вид
+    theme = db.Column(db.String(20), default='light')  # light, dark
+    
+    # Рабочее пространство
+    default_page = db.Column(db.String(50), default='orders')  # orders, optimization, points
+    planning_mode = db.Column(db.String(20), default='manual')  # manual, smart
+    courier_notifications = db.Column(db.String(10), default='off')  # on, off
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Связь с пользователем
+    user = db.relationship('User', backref=db.backref('settings', uselist=False))
+    
+    def to_dict(self):
+        """Сериализация настроек в словарь"""
+        return {
+            'theme': self.theme or 'light',
+            'default_page': self.default_page or 'orders',
+            'planning_mode': self.planning_mode or 'manual',
+            'courier_notifications': self.courier_notifications or 'off'
+        }
+    
+    def __repr__(self):
+        return f'<UserSettings user_id={self.user_id}>'
+
+
 class Courier(db.Model):
     """Модель курьера"""
     __tablename__ = 'couriers'

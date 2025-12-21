@@ -2156,47 +2156,48 @@ def api_point(point_id):
 @app.route('/api/settings', methods=['GET', 'PUT'])
 def api_settings():
     """
-    GET /api/settings - Получение настроек компании
-    
-    Возвращает:
-    {
-        "settings": {
-            "theme": "light|dark",
-            "default_page": "orders|optimization|points",
-            "planning_mode": "manual|smart",
-            "courier_notifications": "on|off"
-        }
-    }
+    GET /api/settings - Получение настроек рабочего пространства
+    PUT /api/settings - Обновление настроек
     """
+    user_id = get_current_user_id()
+    if not user_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Импортируем модель
+    from models import UserSettings
+    
     if request.method == 'GET':
-        return jsonify({
-            'settings': {
-                'theme': 'light',
-                'default_page': 'orders',
-                'planning_mode': 'manual',
-                'courier_notifications': 'off'
-            }
-        })
-    else:
-        """
-        PUT /api/settings - Обновление настроек
+        # Получаем или создаём настройки для пользователя
+        settings = UserSettings.query.filter_by(user_id=user_id).first()
+        if not settings:
+            # Создаём дефолтные настройки
+            settings = UserSettings(user_id=user_id)
+            db.session.add(settings)
+            db.session.commit()
         
-        Тело запроса (все поля опциональны):
-        {
-            "theme": "light|dark",
-            "default_page": "orders|optimization|points",
-            "planning_mode": "manual|smart",
-            "courier_notifications": "on|off"
-        }
+        return jsonify({'settings': settings.to_dict()})
+    
+    else:  # PUT
+        data = request.json or {}
         
-        Возвращает:
-        {
-            "success": true,
-            "message": "Настройки обновлены"
-        }
-        """
-        data = request.json
-        return jsonify({'success': True, 'message': 'Настройки обновлены'})
+        # Получаем или создаём настройки
+        settings = UserSettings.query.filter_by(user_id=user_id).first()
+        if not settings:
+            settings = UserSettings(user_id=user_id)
+            db.session.add(settings)
+        
+        # Обновляем поля
+        if 'theme' in data:
+            settings.theme = data['theme'] if data['theme'] in ['light', 'dark'] else 'light'
+        if 'default_page' in data:
+            settings.default_page = data['default_page'] if data['default_page'] in ['orders', 'optimization', 'points'] else 'orders'
+        if 'planning_mode' in data:
+            settings.planning_mode = data['planning_mode'] if data['planning_mode'] in ['manual', 'smart'] else 'manual'
+        if 'courier_notifications' in data:
+            settings.courier_notifications = data['courier_notifications'] if data['courier_notifications'] in ['on', 'off'] else 'off'
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Настройки сохранены', 'settings': settings.to_dict()})
 
 # ============================================
 # ACCOUNT API - Настройки аккаунта
