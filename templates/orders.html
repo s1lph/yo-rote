@@ -342,6 +342,9 @@
             <div class="form-group">
                 <label class="form-label" for="order_name">Название заказа</label>
                 <input type="text" id="order_name" name="order_name" class="form-input" required>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Уникальный идентификатор заказа (номер, артикул, ID)
+                </small>
             </div>
 
             <div class="form-group">
@@ -351,6 +354,9 @@
                         placeholder="Введите адрес..." autocomplete="off" required>
                     <div id="destination-autocomplete" class="autocomplete-dropdown" style="display: none;"></div>
                 </div>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Адрес доставки или забора груза
+                </small>
                 <!-- Скрытые поля для координат -->
                 <input type="hidden" id="destination_lat" name="destination_lat">
                 <input type="hidden" id="destination_lon" name="destination_lon">
@@ -375,32 +381,50 @@
             <div class="form-group">
                 <label class="form-label" for="visit_date">Дата посещения точки</label>
                 <input type="date" id="visit_date" name="visit_date" class="form-input" required>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Планируемая дата выполнения заказа
+                </small>
             </div>
 
             <div class="form-group">
                 <label class="form-label" for="visit_time">Время посещения точки</label>
                 <input type="time" id="visit_time" name="visit_time" class="form-input" required>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Желаемое время прибытия курьера
+                </small>
             </div>
 
             <div class="form-group">
                 <label class="form-label" for="time_at_point">Время на посещение точки</label>
                 <input type="number" id="time_at_point" name="time_at_point" class="form-input" placeholder="минуты"
                     required>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Сколько минут курьер пробудет на точке (выгрузка, ожидание)
+                </small>
             </div>
 
             <div class="form-group">
                 <label class="form-label" for="company">Компания</label>
                 <input type="text" id="company" name="company" class="form-input" placeholder="Название компании">
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Название компании-получателя (опционально)
+                </small>
             </div>
 
             <div class="form-group">
                 <label class="form-label" for="recipient_name">ФИО получателя</label>
                 <input type="text" id="recipient_name" name="recipient_name" class="form-input" required>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Контактное лицо на точке доставки
+                </small>
             </div>
 
             <div class="form-group">
                 <label class="form-label" for="recipient_phone">Телефон получателя</label>
                 <input type="tel" id="recipient_phone" name="recipient_phone" class="form-input" required>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Курьер позвонит при прибытии
+                </small>
             </div>
 
             <div class="form-group">
@@ -416,6 +440,9 @@
             <div class="form-group">
                 <label class="form-label" for="comment">Комментарий (для курьера)</label>
                 <textarea id="comment" name="comment" class="form-textarea" rows="3"></textarea>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Дополнительные инструкции для курьера (код домофона, этаж)
+                </small>
             </div>
 
             <!-- Новые поля для производственной логистики -->
@@ -425,6 +452,9 @@
                     <option value="delivery">🔽 Доставка</option>
                     <option value="pickup">🔼 Забор</option>
                 </select>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Доставка — везём клиенту, Забор — забираем у клиента
+                </small>
             </div>
 
             <div class="form-group">
