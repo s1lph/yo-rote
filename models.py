@@ -262,6 +262,16 @@ class Order(db.Model):
     # Позиция заказа в маршруте (для сохранения порядка)
     route_position = db.Column(db.Integer, nullable=True)
     
+    # Тип заказа: delivery (доставка) или pickup (забор)
+    type = db.Column(db.String(20), default='delivery')
+    
+    # Жесткая привязка к конкретному курьеру/машине (для VRP Skills)
+    required_courier_id = db.Column(db.Integer, db.ForeignKey('couriers.id'), nullable=True)
+    
+    # Временное окно доставки (формат HH:MM)
+    time_window_start = db.Column(db.String(5), nullable=True)
+    time_window_end = db.Column(db.String(5), nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -308,6 +318,10 @@ class Order(db.Model):
             'point_address': point_address,
             'route_id': self.route_id,
             'courier_name': courier_name,
+            'type': self.type or 'delivery',
+            'required_courier_id': self.required_courier_id,
+            'time_window_start': self.time_window_start,
+            'time_window_end': self.time_window_end,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 

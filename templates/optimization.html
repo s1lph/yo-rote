@@ -958,6 +958,31 @@
         flex-shrink: 0;
     }
 
+    .btn-unassign-order {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border: none;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .btn-unassign-order:hover {
+        background: rgba(239, 68, 68, 0.2);
+        transform: scale(1.1);
+    }
+
+    .btn-unassign-order i {
+        font-size: 12px;
+    }
+
     .route-edit-actions {
         display: flex;
         gap: 12px;
@@ -1656,11 +1681,40 @@
                         <div class="drag-order-name">${order.order_name || 'Заказ #' + order.order_id}</div>
                         <div class="drag-order-address">${order.address || '—'}</div>
                     </div>
+                    <button type="button" class="btn-unassign-order" data-order-id="${order.order_id}" title="Исключить из маршрута">
+                        <i class="fi fi-rr-cross-small"></i>
+                    </button>
                 </div>
             `).join('');
 
             // Add drag event listeners
             initDragAndDrop();
+
+            // Add unassign button listeners
+            routeEditList.querySelectorAll('.btn-unassign-order').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const orderId = btn.dataset.orderId;
+                    if (!orderId) return;
+
+                    try {
+                        const response = await fetch(`/api/orders/${orderId}/unassign`, { method: 'PUT' });
+                        if (response.ok) {
+                            // Удаляем заказ из текущего списка
+                            currentEditOrders = currentEditOrders.filter(o => o.order_id != orderId);
+                            renderDragList();
+                            showNotification('Заказ исключён из маршрута', 'success');
+                            // Обновляем список нераспределённых
+                            loadUnassignedOrders();
+                        } else {
+                            showNotification('Ошибка при исключении заказа', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Unassign error:', error);
+                        showNotification('Ошибка сети', 'error');
+                    }
+                });
+            });
         }
 
         // Initialize drag and drop

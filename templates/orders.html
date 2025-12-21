@@ -310,6 +310,7 @@
                 <thead>
                     <tr>
                         <th style="width: 40px;"></th>
+                        <th style="width: 40px;">Тип</th>
                         <th>Название заказа</th>
                         <th>Точка отправки</th>
                         <th>Адрес получателя</th>
@@ -415,6 +416,40 @@
             <div class="form-group">
                 <label class="form-label" for="comment">Комментарий (для курьера)</label>
                 <textarea id="comment" name="comment" class="form-textarea" rows="3"></textarea>
+            </div>
+
+            <!-- Новые поля для производственной логистики -->
+            <div class="form-group">
+                <label class="form-label" for="order_type">Тип заказа</label>
+                <select id="order_type" name="type" class="form-select">
+                    <option value="delivery">🔽 Доставка</option>
+                    <option value="pickup">🔼 Забор</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="required_courier_id">Обязательная машина</label>
+                <select id="required_courier_id" name="required_courier_id" class="form-select">
+                    <option value="">Любая (авто-распределение)</option>
+                    <!-- Курьеры загружаются через JS -->
+                </select>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Жёсткая привязка заказа к конкретной машине при оптимизации
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Окно доставки</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="time" id="time_window_start" name="time_window_start" class="form-input"
+                        style="flex: 1;" placeholder="С">
+                    <span style="color: var(--text-gray);">—</span>
+                    <input type="time" id="time_window_end" name="time_window_end" class="form-input" style="flex: 1;"
+                        placeholder="По">
+                </div>
+                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
+                    Если не указано, используется 09:00-18:00
+                </small>
             </div>
 
             <button type="submit" class="btn btn-primary" id="submit-order-btn">Создать</button>
@@ -780,6 +815,13 @@
                 courierSelect.disabled = false;
                 courierSelect.innerHTML = '<option value="">Выберите курьера</option>' +
                     couriers.map(courier => `<option value="${courier.id}">${courier.full_name}</option>`).join('');
+
+                // Заполняем также селектор обязательной машины
+                const requiredCourierSelect = document.getElementById('required_courier_id');
+                if (requiredCourierSelect) {
+                    requiredCourierSelect.innerHTML = '<option value="">Любая (авто-распределение)</option>' +
+                        couriers.map(courier => `<option value="${courier.id}">${courier.full_name}</option>`).join('');
+                }
             } catch (error) {
                 console.error('Error loading couriers:', error);
                 courierSelect.innerHTML = '<option value="">Не удалось загрузить курьеров</option>';
@@ -1225,7 +1267,7 @@
             if (!orders.length) {
                 return `
                     <tr>
-                        <td colspan="12" style="text-align:center; padding:24px; color: var(--text-gray);">
+                        <td colspan="13" style="text-align:center; padding:24px; color: var(--text-gray);">
                             Заказы отсутствуют
                         </td>
                     </tr>
@@ -1245,9 +1287,16 @@
                 const recipientPhone = order.recipient_phone || '—';
                 const statusBadge = getStatusBadge(order.status);
 
+                // Иконка типа заказа
+                const orderType = order.type || 'delivery';
+                const typeIcon = orderType === 'pickup'
+                    ? '<i class="fi fi-sr-arrow-up" style="color: #22c55e;" title="Забор"></i>'
+                    : '<i class="fi fi-sr-arrow-down" style="color: #3b82f6;" title="Доставка"></i>';
+
                 return `
                     <tr data-order-row>
                         <td><input type="radio" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
+                        <td>${typeIcon}</td>
                         <td><strong>${orderName}</strong></td>
                         <td>${pointAddress}</td>
                         <td>${address}</td>

@@ -655,6 +655,13 @@ def api_orders():
                 point_id = int(data['point_id'])
             except (ValueError, TypeError):
                 point_id = None
+        # Преобразование required_courier_id в int, если он есть
+        required_courier_id = None
+        if data.get('required_courier_id'):
+            try:
+                required_courier_id = int(data['required_courier_id'])
+            except (ValueError, TypeError):
+                required_courier_id = None
         
         # Создание заказа с привязкой к текущему пользователю
         order = Order(
@@ -671,7 +678,12 @@ def api_orders():
             company=data.get('company'),
             courier_id=courier_id,
             point_id=point_id,
-            status='planned'
+            status='planned',
+            # Новые поля для производственной логистики
+            type=data.get('type', 'delivery'),
+            required_courier_id=required_courier_id,
+            time_window_start=data.get('time_window_start'),
+            time_window_end=data.get('time_window_end')
         )
         
         # Если координаты уже переданы с фронтенда, используем их
@@ -837,8 +849,53 @@ def api_order(order_id):
             else:
                 order.point_id = None
         
+        # Обработка новых полей для производственной логистики
+        if 'type' in data:
+            order.type = data['type'] if data['type'] in ['delivery', 'pickup'] else 'delivery'
+        
+        if 'required_courier_id' in data:
+            if data['required_courier_id']:
+                try:
+                    order.required_courier_id = int(data['required_courier_id'])
+                except (ValueError, TypeError):
+                    order.required_courier_id = None
+            else:
+                order.required_courier_id = None
+        
+        if 'time_window_start' in data:
+            order.time_window_start = data['time_window_start']
+        
+        if 'time_window_end' in data:
+            order.time_window_end = data['time_window_end']
+        
         db.session.commit()
         return jsonify({'success': True, 'message': 'Заказ обновлен'})
+
+@app.route('/api/orders/<int:order_id>/unassign', methods=['PUT'])
+def api_order_unassign(order_id):
+    """
+    PUT /api/orders/<id>/unassign - Исключить заказ из маршрута
+    
+    Сбрасывает привязку заказа к маршруту и возвращает его в статус 'planned'.
+    Используется для ручного управления маршрутами.
+    
+    Возвращает:
+    {
+        "success": true,
+        "message": "Заказ исключен из маршрута"
+    }
+    """
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
+    
+    order.route_id = None
+    order.route_position = None
+    order.status = 'planned'
+    
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Заказ исключен из маршрута'})
+
 
 @app.route('/api/orders/batch', methods=['DELETE', 'PUT'])
 def api_orders_batch():
