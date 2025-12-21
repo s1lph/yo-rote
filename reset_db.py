@@ -21,11 +21,14 @@ conn = psycopg2.connect(DATABASE_URL)
 conn.autocommit = True
 cursor = conn.cursor()
 
-print("🗑️ Dropping all tables...")
+print("🗑️ Dropping schema with all types...")
 cursor.execute("DROP SCHEMA public CASCADE;")
 cursor.execute("CREATE SCHEMA public;")
+cursor.execute("GRANT ALL ON SCHEMA public TO public;")
+cursor.execute("GRANT ALL ON SCHEMA public TO CURRENT_USER;")
 
 cursor.close()
 conn.close()
 
-print("✅ Database reset complete! Tables will be recreated on next deploy.")
+print("✅ Database reset complete! Redeploy to recreate tables.")
+
