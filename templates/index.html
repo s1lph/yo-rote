@@ -366,11 +366,13 @@
         padding: 5px;
         border-radius: 50px;
         display: flex;
+        flex-wrap: nowrap;
         gap: 5px;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         z-index: 1000;
         border: 1px solid rgba(255, 255, 255, 0.3);
         transition: transform 0.3s ease, opacity 0.3s ease;
+        max-width: 95vw;
     }
 
     .nav-item {
@@ -383,6 +385,7 @@
         position: relative;
         z-index: 2;
         transition: color 0.3s ease;
+        white-space: nowrap;
     }
 
     .nav-item.active {
@@ -398,6 +401,52 @@
         border-radius: 30px;
         z-index: 1;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Responsive Pill Nav */
+    @media (max-width: 900px) {
+        .nav-item {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+        }
+
+        .pill-nav {
+            gap: 3px;
+            padding: 4px;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .nav-item {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+
+        .pill-nav {
+            gap: 2px;
+            padding: 3px;
+        }
+    }
+
+    @media (max-width: 550px) {
+        .pill-nav {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            justify-content: flex-start;
+            max-width: 92vw;
+        }
+
+        .pill-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-item {
+            padding: 8px 12px;
+            font-size: 0.75rem;
+        }
     }
 
     /* Hero Image 3D Tilt */
