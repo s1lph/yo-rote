@@ -62,7 +62,6 @@ class User(db.Model):
             code = ''.join(random.choice(chars) for _ in range(12))
             # Проверяем уникальность среди User и Courier
             existing_user = User.query.filter_by(auth_code=code).first()
-            from models import Courier
             existing_courier = Courier.query.filter_by(auth_code=code).first()
             if (not existing_user or existing_user.id == self.id) and not existing_courier:
                 self.auth_code = code
@@ -152,7 +151,7 @@ class Courier(db.Model):
     auth_key = db.Column(db.String(255))
     
     # Telegram интеграция
-    auth_code = db.Column(db.String(6), unique=True, nullable=True)  # 6-значный код авторизации
+    auth_code = db.Column(db.String(20), unique=True, nullable=True)  # 12-символьный код авторизации
     telegram_chat_id = db.Column(db.String(50), nullable=True)  # ID чата Telegram
     
     # Live-трекинг курьера

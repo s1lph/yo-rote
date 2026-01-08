@@ -2,11 +2,13 @@ from flask import Flask, render_template, jsonify, request, session, url_for
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+import secrets
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 import jwt
 from authlib.integrations.flask_client import OAuth
+from sqlalchemy import or_
 
 
 # Загрузка переменных окружения из .env файла
@@ -17,7 +19,11 @@ from models import db, User, Courier, Order, Route, Point
 import optimizer
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS: разрешённые домены из переменных окружения или дефолт для разработки
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000').split(',')
+cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+CORS(app, resources={r"/api/*": {"origins": cors_origins}}, supports_credentials=True)
 
 # Конфигурация базы данных
 # Railway использует postgres://, но SQLAlchemy требует postgresql://
@@ -27,7 +33,17 @@ if database_url.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# SECRET_KEY: обязателен для production, генерируется для разработки
+if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PRODUCTION'):
+    secret_key = os.getenv('SECRET_KEY')
+    if not secret_key:
+        raise RuntimeError('SECRET_KEY environment variable is required in production!')
+    app.config['SECRET_KEY'] = secret_key
+else:
+    # Режим разработки - используем переменную окружения или генерируем временный ключ
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
+
 app.config['SESSION_TYPE'] = 'filesystem'
 
 # Инициализация БД
@@ -138,6 +154,50 @@ def get_current_user_id():
     
     # Fallback на session для обратной совместимости
     return session.get('user_id')
+
+
+def get_order_with_owner_check(order_id):
+    """
+    Получает заказ с проверкой владельца.
+    Возвращает Order если он принадлежит текущему пользователю, иначе None.
+    """
+    user_id = get_current_user_id()
+    if not user_id:
+        return None
+    return Order.query.filter_by(id=order_id, user_id=user_id).first()
+
+
+def get_courier_with_owner_check(courier_id):
+    """
+    Получает курьера с проверкой владельца.
+    Возвращает Courier если он принадлежит текущему пользователю, иначе None.
+    """
+    user_id = get_current_user_id()
+    if not user_id:
+        return None
+    return Courier.query.filter_by(id=courier_id, user_id=user_id).first()
+
+
+def get_route_with_owner_check(route_id):
+    """
+    Получает маршрут с проверкой владельца.
+    Возвращает Route если он принадлежит текущему пользователю, иначе None.
+    """
+    user_id = get_current_user_id()
+    if not user_id:
+        return None
+    return Route.query.filter_by(id=route_id, user_id=user_id).first()
+
+
+def get_point_with_owner_check(point_id):
+    """
+    Получает точку с проверкой владельца.
+    Возвращает Point если она принадлежит текущему пользователю, иначе None.
+    """
+    user_id = get_current_user_id()
+    if not user_id:
+        return None
+    return Point.query.filter_by(id=point_id, user_id=user_id).first()
 
 # Главная страница - редирект на вход или дашборд
 @app.route('/')
@@ -590,11 +650,13 @@ def api_orders():
         if visit_date:
             query = query.filter_by(visit_date=visit_date)
         if search:
-            query = query.filter(
-                (Order.order_name.like(f'%{search}%')) |
-                (Order.address.like(f'%{search}%')) |
-                (Order.recipient_name.like(f'%{search}%'))
-            )
+            # Безопасный поиск с параметризованным запросом (защита от SQL injection)
+            search_pattern = f'%{search}%'
+            query = query.filter(or_(
+                Order.order_name.ilike(search_pattern),
+                Order.address.ilike(search_pattern),
+                Order.recipient_name.ilike(search_pattern)
+            ))
         
         # Пагинация
         total = query.count()
@@ -738,7 +800,7 @@ def api_order(order_id):
     }
     """
     if request.method == 'GET':
-        order = Order.query.get(order_id)
+        order = get_order_with_owner_check(order_id)
         if not order:
             return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
         return jsonify({'success': True, 'order': order.to_dict()})
@@ -752,7 +814,7 @@ def api_order(order_id):
             "message": "Заказ удален"
         }
         """
-        order = Order.query.get(order_id)
+        order = get_order_with_owner_check(order_id)
         if not order:
             return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
         
@@ -784,7 +846,7 @@ def api_order(order_id):
             "message": "Заказ обновлен"
         }
         """
-        order = Order.query.get(order_id)
+        order = get_order_with_owner_check(order_id)
         if not order:
             return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
         
@@ -885,7 +947,7 @@ def api_order_unassign(order_id):
         "message": "Заказ исключен из маршрута"
     }
     """
-    order = Order.query.get(order_id)
+    order = get_order_with_owner_check(order_id)
     if not order:
         return jsonify({'success': False, 'message': 'Заказ не найден'}), 404
     
@@ -921,7 +983,15 @@ def api_orders_batch():
         if not ids:
             return jsonify({'success': False, 'message': 'Не указаны ID заказов'}), 400
         
-        deleted_count = Order.query.filter(Order.id.in_(ids)).delete(synchronize_session=False)
+        # Защита от IDOR: удаляем только заказы текущего пользователя
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        
+        deleted_count = Order.query.filter(
+            Order.id.in_(ids),
+            Order.user_id == user_id
+        ).delete(synchronize_session=False)
         db.session.commit()
         
         return jsonify({
@@ -951,9 +1021,34 @@ def api_orders_batch():
         """
         data = request.json
         ids = data.get('ids', [])
+        updates = data.get('updates', {})
+        
+        if not ids:
+            return jsonify({'success': False, 'message': 'Не указаны ID заказов'}), 400
+        
+        # Защита от IDOR: обновляем только заказы текущего пользователя
+        user_id = get_current_user_id()
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        
+        # Получаем только заказы текущего пользователя для обновления
+        orders_to_update = Order.query.filter(
+            Order.id.in_(ids),
+            Order.user_id == user_id
+        ).all()
+        
+        updated_count = 0
+        for order in orders_to_update:
+            if 'status' in updates and updates['status'] in ['planned', 'in_progress', 'completed', 'failed']:
+                order.status = updates['status']
+            if 'courier_id' in updates:
+                order.courier_id = updates['courier_id'] if updates['courier_id'] else None
+            updated_count += 1
+        
+        db.session.commit()
         return jsonify({
             'success': True,
-            'updated_count': len(ids),
+            'updated_count': updated_count,
             'message': 'Заказы обновлены'
         })
 
@@ -1286,7 +1381,7 @@ def api_route(route_id):
     }
     """
     if request.method == 'GET':
-        route = Route.query.get(route_id)
+        route = get_route_with_owner_check(route_id)
         if not route:
             return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
         return jsonify(route.to_dict())
@@ -1307,7 +1402,7 @@ def api_route(route_id):
             "message": "Маршрут обновлен"
         }
         """
-        route = Route.query.get(route_id)
+        route = get_route_with_owner_check(route_id)
         if not route:
             return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
         
@@ -1330,7 +1425,7 @@ def api_route(route_id):
             "message": "Маршрут удален"
         }
         """
-        route = Route.query.get(route_id)
+        route = get_route_with_owner_check(route_id)
         if not route:
             return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
         
@@ -1512,7 +1607,7 @@ def api_route_edit(route_id):
     """
     data = request.json
     
-    route = Route.query.get(route_id)
+    route = get_route_with_owner_check(route_id)
     if not route:
         return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
     
@@ -1568,7 +1663,7 @@ def api_route_optimize_view(route_id):
         ]
     }
     """
-    route = Route.query.get(route_id)
+    route = get_route_with_owner_check(route_id)
     if not route:
         return jsonify({'success': False, 'message': 'Маршрут не найден'}), 404
     
@@ -1761,7 +1856,7 @@ def api_courier(courier_id):
     }
     """
     if request.method == 'GET':
-        courier = Courier.query.get(courier_id)
+        courier = get_courier_with_owner_check(courier_id)
         if not courier:
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
         return jsonify(courier.to_dict())
@@ -1784,7 +1879,7 @@ def api_courier(courier_id):
             "message": "Курьер обновлен"
         }
         """
-        courier = Courier.query.get(courier_id)
+        courier = get_courier_with_owner_check(courier_id)
         if not courier:
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
         
@@ -1821,7 +1916,7 @@ def api_courier(courier_id):
             "message": "Курьер удален"
         }
         """
-        courier = Courier.query.get(courier_id)
+        courier = get_courier_with_owner_check(courier_id)
         if not courier:
             return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
         
@@ -1849,7 +1944,7 @@ def api_courier_regenerate_code(courier_id):
         "message": "Код обновлен"
     }
     """
-    courier = Courier.query.get(courier_id)
+    courier = get_courier_with_owner_check(courier_id)
     if not courier:
         return jsonify({'success': False, 'message': 'Курьер не найден'}), 404
     
@@ -2068,7 +2163,7 @@ def api_point(point_id):
     }
     """
     if request.method == 'GET':
-        point = Point.query.get(point_id)
+        point = get_point_with_owner_check(point_id)
         if not point:
             return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
         return jsonify({'success': True, 'point': point.to_dict()})
@@ -2090,7 +2185,7 @@ def api_point(point_id):
             "message": "Точка обновлена"
         }
         """
-        point = Point.query.get(point_id)
+        point = get_point_with_owner_check(point_id)
         if not point:
             return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
             
@@ -2135,7 +2230,7 @@ def api_point(point_id):
             "message": "Нельзя удалить основную точку" или "Точка используется в заказах"
         }
         """
-        point = Point.query.get(point_id)
+        point = get_point_with_owner_check(point_id)
         if not point:
             return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
             
