@@ -388,18 +388,17 @@
 
             <div class="form-group">
                 <label class="form-label" for="visit_time">Время посещения точки</label>
-                <input type="time" id="visit_time" name="visit_time" class="form-input" required>
+                <input type="time" id="visit_time" name="visit_time" class="form-input">
                 <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
-                    Желаемое время прибытия курьера
+                    Желаемое время прибытия курьера (если не указано — любое)
                 </small>
             </div>
 
             <div class="form-group">
                 <label class="form-label" for="time_at_point">Время на посещение точки</label>
-                <input type="number" id="time_at_point" name="time_at_point" class="form-input" placeholder="минуты"
-                    required>
+                <input type="number" id="time_at_point" name="time_at_point" class="form-input" placeholder="минуты">
                 <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
-                    Сколько минут курьер пробудет на точке (выгрузка, ожидание)
+                    Сколько минут курьер пробудет на точке (по умолчанию: 15 мин)
                 </small>
             </div>
 
@@ -454,31 +453,6 @@
                 </select>
                 <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
                     Доставка — везём клиенту, Забор — забираем у клиента
-                </small>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="required_courier_id">Обязательная машина</label>
-                <select id="required_courier_id" name="required_courier_id" class="form-select">
-                    <option value="">Любая (авто-распределение)</option>
-                    <!-- Курьеры загружаются через JS -->
-                </select>
-                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
-                    Жёсткая привязка заказа к конкретной машине при оптимизации
-                </small>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Окно доставки</label>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <input type="time" id="time_window_start" name="time_window_start" class="form-input"
-                        style="flex: 1;" placeholder="С">
-                    <span style="color: var(--text-gray);">—</span>
-                    <input type="time" id="time_window_end" name="time_window_end" class="form-input" style="flex: 1;"
-                        placeholder="По">
-                </div>
-                <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
-                    Если не указано, используется 09:00-18:00
                 </small>
             </div>
 

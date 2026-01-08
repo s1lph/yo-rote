@@ -88,13 +88,14 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
         
         valid_orders_map[order.id] = order
         
-        # Время на точке (в секундах). Если не указано, берем 5 минут (300с)
-        service_duration = (order.time_at_point or 5) * 60
+        # Время на точке (в секундах). Если не указано, берем 15 минут (900с)
+        service_duration = (order.time_at_point or 15) * 60
         
         # Skills: если указан required_courier_id, добавляем требование конкретной машины
+        # ORS требует skills как integers
         job_skills = None
         if hasattr(order, 'required_courier_id') and order.required_courier_id:
-            job_skills = [f'vehicle_{order.required_courier_id}']
+            job_skills = [order.required_courier_id]
         
         # Временные окна доставки
         time_windows = get_time_windows(order)
@@ -129,7 +130,8 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
             profile = 'foot-walking'
 
         # Skills: уникальный skill для каждого курьера (для привязки заказов)
-        vehicle_skills = [f'vehicle_{courier.id}']
+        # ORS требует skills как integers - используем ID курьера
+        vehicle_skills = [courier.id]
 
         vehicles.append(optimization.Vehicle(
             id=courier.id,
