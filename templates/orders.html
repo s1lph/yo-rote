@@ -1391,10 +1391,17 @@
                     const recipientPhone = order.recipient_phone || '—';
                     const statusBadge = getStatusBadge(order.status);
 
+                    // Иконка типа заказа
+                    const orderType = order.type || 'delivery';
+                    const typeIcon = orderType === 'pickup'
+                        ? '<i class="fi fi-sr-arrow-up" style="color: #22c55e;" title="Забор"></i>'
+                        : '<i class="fi fi-sr-arrow-down" style="color: #3b82f6;" title="Доставка"></i>';
+
                     // Данные для ячеек (по порядку столбцов)
                     // Index 0 - Radio button (не трогаем при обновлении)
                     const cellData = [
                         null, // Radio (skip)
+                        typeIcon,
                         `<strong>${orderName}</strong>`,
                         pointAddress,
                         address,
