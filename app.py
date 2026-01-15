@@ -9,6 +9,7 @@ import pandas as pd
 import jwt
 from authlib.integrations.flask_client import OAuth
 from sqlalchemy import or_
+import re
 
 
 # Загрузка переменных окружения из .env файла
@@ -268,8 +269,19 @@ def api_register():
     # Валидация
     if not data.get('email'):
         return jsonify({'success': False, 'message': 'Email обязателен'}), 400
+    
+    # Валидация формата email
+    EMAIL_REGEX = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(EMAIL_REGEX, data['email']):
+        return jsonify({'success': False, 'message': 'Некорректный формат email'}), 400
+    
     if not data.get('password'):
         return jsonify({'success': False, 'message': 'Пароль обязателен'}), 400
+    
+    # Валидация минимальной длины пароля
+    if len(data['password']) < 8:
+        return jsonify({'success': False, 'message': 'Пароль должен содержать минимум 8 символов'}), 400
+    
     if not data.get('company_name'):
         return jsonify({'success': False, 'message': 'Название компании обязательно'}), 400
     if not data.get('terms'):
@@ -637,12 +649,11 @@ def api_orders():
         visit_date = request.args.get('visit_date', None)
         search = request.args.get('search', None)
         
-        # Базовый запрос - фильтрация по текущему пользователю
+        # Базовый запрос - требуется авторизация
         user_id = get_current_user_id()
-        if user_id:
-            query = Order.query.filter_by(user_id=user_id)
-        else:
-            query = Order.query  # Для неавторизованных - все данные
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        query = Order.query.filter_by(user_id=user_id)
         
         # Применение фильтров
         if status:
@@ -1285,12 +1296,11 @@ def api_routes():
         courier_id = request.args.get('courier_id', None, type=int)
         status = request.args.get('status', None)
         
-        # Базовый запрос - фильтрация по текущему пользователю
+        # Базовый запрос - требуется авторизация
         user_id = get_current_user_id()
-        if user_id:
-            query = Route.query.filter_by(user_id=user_id)
-        else:
-            query = Route.query  # Для неавторизованных - все данные
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        query = Route.query.filter_by(user_id=user_id)
         
         # Применение фильтров
         if date:
@@ -1764,12 +1774,11 @@ def api_couriers():
     }
     """
     if request.method == 'GET':
-        # Фильтрация по текущему пользователю
+        # Требуется авторизация
         user_id = get_current_user_id()
-        if user_id:
-            couriers = Courier.query.filter_by(user_id=user_id).all()
-        else:
-            couriers = Courier.query.all()  # Для неавторизованных - все данные
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        couriers = Courier.query.filter_by(user_id=user_id).all()
         return jsonify({
             'couriers': [courier.to_dict() for courier in couriers]
         })
@@ -2080,12 +2089,11 @@ def api_points():
     }
     """
     if request.method == 'GET':
-        # Фильтрация по текущему пользователю
+        # Требуется авторизация
         user_id = get_current_user_id()
-        if user_id:
-            points = Point.query.filter_by(user_id=user_id).all()
-        else:
-            points = Point.query.all()  # Для неавторизованных - все данные
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Требуется авторизация'}), 401
+        points = Point.query.filter_by(user_id=user_id).all()
         return jsonify({'points': [point.to_dict() for point in points]})
     else:
         """
@@ -2235,10 +2243,11 @@ def api_point(point_id):
             return jsonify({'success': False, 'message': 'Точка не найдена'}), 404
             
         if point.is_primary:
-             # Проверяем, есть ли другие точки
-            other_points_count = Point.query.filter(Point.id != point_id).count()
+            # Проверяем, есть ли другие точки ЭТОГО ПОЛЬЗОВАТЕЛЯ
+            user_id = get_current_user_id()
+            other_points_count = Point.query.filter(Point.id != point_id, Point.user_id == user_id).count()
             if other_points_count > 0:
-                 return jsonify({'success': False, 'message': 'Нельзя удалить основную точку, назначьте другую точку основной'}), 400
+                return jsonify({'success': False, 'message': 'Нельзя удалить основную точку, назначьте другую точку основной'}), 400
         
         db.session.delete(point)
         db.session.commit()
