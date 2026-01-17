@@ -66,52 +66,16 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
         return [[int(start_dt.timestamp()), int(end_dt.timestamp())]]
 
     
-    jobs = []
-    valid_orders_map = {}
-
-    for order in orders:
-        if not order.lat or not order.lon:
-            print(f" Пропуск заказа ID {order.id}: нет координат")
-            continue
-        
-        valid_orders_map[order.id] = order
-        
-        
-        service_duration = (order.time_at_point or 15) * 60
-        
-        
-        
-        job_skills = None
-        if hasattr(order, 'required_courier_id') and order.required_courier_id:
-            job_skills = [order.required_courier_id]
-        elif hasattr(order, 'courier_id') and order.courier_id:
-            # Если заказ уже закреплен за курьером вручную, учитываем это при оптимизации
-            job_skills = [order.courier_id]
-        
-        
-        time_windows = get_time_windows(order)
-        
-        jobs.append(optimization.Job(
-            id=order.id,
-            location=[order.lon, order.lat],
-            service=service_duration,
-            skills=job_skills,
-            time_windows=time_windows
-        ))
-
-    if not jobs:
-        return []
-
+    valid_orders_map = {o.id: o for o in orders if o.lat and o.lon}
     
-    vehicles = []
-    courier_map = {}  
+    # Prepare final payload for VROOM-compatible ORS endpoint
+    payload = {
+        "vehicles": [],
+        "shipments": [],
+        "options": {"g": True}
+    }
 
     for courier in couriers:
-        courier_map[courier.id] = courier
-        
-        
-        
-        
         profile = 'driving-car'
         if courier.vehicle_type == 'truck':
             profile = 'driving-hgv'
@@ -120,31 +84,65 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
         elif courier.vehicle_type == 'walk':
             profile = 'foot-walking'
 
-        
-        
-        vehicle_skills = [courier.id]
-
-        # Use courier's start location
         start_coords = [courier.start_lon, courier.start_lat] if courier.start_lon and courier.start_lat else depot_coords
         
-        vehicles.append(optimization.Vehicle(
-            id=courier.id,
-            profile=profile,
-            start=start_coords,  
-            end=start_coords,    
-            capacity=[courier.capacity or 50],  
-            skills=vehicle_skills
-        ))
+        payload["vehicles"].append({
+            "id": courier.id,
+            "profile": profile,
+            "start": start_coords,
+            "end": start_coords,
+            "capacity": [courier.capacity or 50],
+            "skills": [courier.id]
+        })
 
-    
-    
+    for order_id, order in valid_orders_map.items():
+        service_duration = (order.time_at_point or 15) * 60
+        job_skills = [order.required_courier_id] if getattr(order, 'required_courier_id', None) else ([order.courier_id] if getattr(order, 'courier_id', None) else None)
+        time_windows = get_time_windows(order)
+        order_type = getattr(order, 'type', 'delivery')
+        
+        shipment = {
+            "id": order.id,
+            "amount": [1]
+        }
+        if job_skills:
+            shipment["skills"] = job_skills
+        
+        if order_type == 'pickup':
+            # Customer -> Depot
+            shipment["pickup"] = {
+                "id": order.id, # Customer visit
+                "location": [order.lon, order.lat],
+                "service": service_duration,
+                "time_windows": time_windows
+            }
+            shipment["delivery"] = {
+                "id": order.id + 1000000, # Depot visit (dummy id)
+                "location": depot_coords,
+                "service": 300
+            }
+        else:
+            # Delivery: Depot -> Customer
+            shipment["pickup"] = {
+                "id": order.id + 1000000, # Depot visit (dummy id)
+                "location": depot_coords,
+                "service": 300
+            }
+            shipment["delivery"] = {
+                "id": order.id, # Customer visit
+                "location": [order.lon, order.lat],
+                "service": service_duration,
+                "time_windows": time_windows
+            }
+        payload["shipments"].append(shipment)
+
+    if not payload["shipments"]:
+        return []
+
     try:
-        print(f" Запуск VRP: {len(jobs)} заказов, {len(vehicles)} курьеров")
-        response = client.optimization(
-            jobs=jobs,
-            vehicles=vehicles,
-            geometry=True
-        )
+        print(f" Запуск VRP: {len(payload['shipments'])} заказов, {len(payload['vehicles'])} курьеров")
+        # Direct call to bypass SDK object bugs
+        response = client.request("/optimization", {}, post_json=payload)
     except Exception as e:
         print(f" Ошибка API оптимизации: {e}")
         return []
@@ -158,9 +156,22 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
             
             
             sorted_order_ids = []
+            
+            # Record tracking for shipments:
+            # VROOM returns 'pickup' and 'delivery' steps for shipments.
+            # We want to identify the 'customer visit'.
+            # Delivery order -> delivery step is at customer.
+            # Pickup order -> pickup step is at customer.
             for step in route['steps']:
-                if step['type'] == 'job':
-                    sorted_order_ids.append(step['id'])
+                if step['type'] in ['pickup', 'delivery']:
+                    shipment_id = step.get('id')
+                    if shipment_id in valid_orders_map:
+                        order = valid_orders_map[shipment_id]
+                        order_type = getattr(order, 'type', 'delivery')
+                        if step['type'] == order_type:
+                            sorted_order_ids.append(shipment_id)
+                elif step['type'] == 'job':
+                     sorted_order_ids.append(step['id'])
             
             if not sorted_order_ids:
                 continue  
