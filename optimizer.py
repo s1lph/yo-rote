@@ -84,6 +84,9 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
         job_skills = None
         if hasattr(order, 'required_courier_id') and order.required_courier_id:
             job_skills = [order.required_courier_id]
+        elif hasattr(order, 'courier_id') and order.courier_id:
+            # Если заказ уже закреплен за курьером вручную, учитываем это при оптимизации
+            job_skills = [order.courier_id]
         
         
         time_windows = get_time_windows(order)
@@ -133,6 +136,7 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
             skills=vehicle_skills
         ))
 
+    
     
     try:
         print(f" Запуск VRP: {len(jobs)} заказов, {len(vehicles)} курьеров")
