@@ -127,7 +127,7 @@
         color: var(--text-gray);
     }
 
-    /* Animation Classes */
+
     .animate-on-scroll {
         opacity: 0;
         transform: translateY(30px);
@@ -139,7 +139,7 @@
         transform: translateY(0);
     }
 
-    /* Staggered delays for grid items */
+
     .feature-card:nth-child(1) {
         transition-delay: 0.1s;
     }
@@ -152,7 +152,7 @@
         transition-delay: 0.3s;
     }
 
-    /* Specific animations */
+
     .slide-in-left {
         transform: translateX(-50px);
     }
@@ -192,7 +192,7 @@
         transform: translateY(-5px);
     }
 
-    /* Staggered delays for why-us items */
+
     .why-us-card:nth-child(1) {
         transition-delay: 0.1s;
     }
@@ -231,7 +231,7 @@
         line-height: 1.5;
     }
 
-    /* Use Cases Section */
+
     .use-cases-section {
         padding: 60px 20px;
         max-width: 1200px;
@@ -286,7 +286,7 @@
         flex-shrink: 0;
     }
 
-    /* Stats Section */
+
     .stats-section {
         padding: 60px 20px;
         margin: 40px 0;
@@ -327,7 +327,7 @@
         margin: 0;
     }
 
-    /* Staggered delays for stat items */
+
     .stat-card:nth-child(1) {
         transition-delay: 0.1s;
     }
@@ -340,7 +340,7 @@
         transition-delay: 0.3s;
     }
 
-    /* CTA Footer */
+
     .cta-footer {
         text-align: center;
         color: var(--text-gray);
@@ -355,7 +355,7 @@
         color: var(--text-color);
     }
 
-    /* Pill Nav */
+
     .pill-nav {
         position: fixed;
         top: 20px;
@@ -403,7 +403,7 @@
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Responsive Pill Nav */
+
     @media (max-width: 900px) {
         .nav-item {
             padding: 8px 14px;
@@ -449,7 +449,7 @@
         }
     }
 
-    /* Hero Image 3D Tilt */
+
     .hero-image-container {
         margin-top: 50px;
         margin-bottom: 80px;
@@ -735,7 +735,7 @@
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('is-visible');
-                    observer.unobserve(entry.target); // Animate only once
+                    observer.unobserve(entry.target);
                 }
             });
         }, observerOptions);
@@ -743,7 +743,7 @@
         const elements = document.querySelectorAll('.animate-on-scroll');
         elements.forEach(el => observer.observe(el));
 
-        // Pill Nav Logic
+
         const navItems = document.querySelectorAll('.nav-item');
         const indicator = document.querySelector('.nav-indicator');
         const sections = document.querySelectorAll('div[id]');
@@ -754,7 +754,7 @@
             indicator.style.left = `${element.offsetLeft}px`;
         }
 
-        // Initial position
+
         if (navItems.length > 0) {
             updateIndicator(navItems[0]);
         }
@@ -768,14 +768,14 @@
                     targetSection.scrollIntoView({ behavior: 'smooth' });
                 }
 
-                // Update active state manually for immediate feedback
+
                 navItems.forEach(nav => nav.classList.remove('active'));
                 item.classList.add('active');
                 updateIndicator(item);
             });
         });
 
-        // Scroll Spy Logic
+
         const nav = document.querySelector('.pill-nav');
 
         window.addEventListener('scroll', () => {
@@ -783,7 +783,7 @@
             sections.forEach(section => {
                 const sectionTop = section.offsetTop;
                 const sectionHeight = section.clientHeight;
-                if (scrollY >= (sectionTop - 300)) { // Adjusted offset for better trigger
+                if (scrollY >= (sectionTop - 300)) {
                     current = section.getAttribute('id');
                 }
             });
@@ -797,7 +797,7 @@
             });
         });
 
-        // 3D Tilt Animation for Hero Image
+
         const heroContainer = document.querySelector('.hero-image-container');
         const mockupWindow = document.querySelector('.mockup-window');
 
@@ -807,33 +807,33 @@
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
-                // Calculate rotation based on mouse position relative to center
+
                 const centerX = rect.width / 2;
                 const centerY = rect.height / 2;
 
-                const rotateX = ((y - centerY) / centerY) * -5; // Max 5deg rotation
-                const rotateY = ((x - centerX) / centerX) * 5; // Max 5deg rotation
+                const rotateX = ((y - centerY) / centerY) * -5;
+                const rotateY = ((x - centerX) / centerX) * 5;
 
                 mockupWindow.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
             });
 
             heroContainer.addEventListener('mouseleave', () => {
                 mockupWindow.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
-                mockupWindow.style.transition = 'transform 0.5s ease'; // Slower return
+                mockupWindow.style.transition = 'transform 0.5s ease';
             });
 
             heroContainer.addEventListener('mouseenter', () => {
-                mockupWindow.style.transition = 'transform 0.1s ease'; // Fast response
+                mockupWindow.style.transition = 'transform 0.1s ease';
             });
         }
 
-        // Проверка авторизации для CTA кнопок
+
         const ctaStart = document.getElementById('cta-start');
         const ctaTry = document.getElementById('cta-try');
         const token = localStorage.getItem('auth_token');
 
         if (token) {
-            // Если есть токен, перенаправляем на /orders
+
             if (ctaStart) {
                 ctaStart.href = '/orders';
                 ctaStart.textContent = 'Перейти в панель';

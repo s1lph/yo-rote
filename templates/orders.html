@@ -4,11 +4,10 @@
 {% block title %}Заказы - yo.route{% endblock %}
 
 {% block extra_css %}
-<!-- Leaflet.js CSS for map -->
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
-    /* Autocomplete dropdown styles */
     .autocomplete-dropdown {
         position: absolute;
         top: 100%;
@@ -53,7 +52,7 @@
         border-radius: 12px;
     }
 
-    /* Import Modal Styles */
+
     .modal-overlay {
         position: fixed;
         top: 0;
@@ -283,7 +282,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- Основная страница со списком заказов -->
+
 <div class="two-column" id="orders-container" style="max-width: 100%;">
     <div class="column" id="orders-list-page" style="padding-bottom: 80px;">
         <div class="page-header"
@@ -325,7 +324,7 @@
                     </tr>
                 </thead>
                 <tbody id="orders-table-body">
-                    <!-- Заказы загружаются через JavaScript -->
+
                 </tbody>
             </table>
         </div>
@@ -357,7 +356,7 @@
                 <small style="display:block; margin-top:4px; color:var(--text-gray); font-size:12px;">
                     Адрес доставки или забора груза
                 </small>
-                <!-- Скрытые поля для координат -->
+
                 <input type="hidden" id="destination_lat" name="destination_lat">
                 <input type="hidden" id="destination_lon" name="destination_lon">
             </div>
@@ -444,7 +443,7 @@
                 </small>
             </div>
 
-            <!-- Новые поля для производственной логистики -->
+
             <div class="form-group">
                 <label class="form-label" for="order_type">Тип заказа</label>
                 <select id="order_type" name="type" class="form-select">
@@ -464,7 +463,7 @@
         </div>
     </div>
 </div>
-<!-- Панель действий для выбранных заказов -->
+
 <div id="selected-orders-panel" class="selection-panel">
     <div class="selection-panel-content">
         <span id="selected-count" class="selection-panel-text">Выбран 1 заказ</span>
@@ -485,7 +484,7 @@
     </div>
 </div>
 
-<!-- Модальное окно импорта Excel -->
+
 <div id="import-modal" class="modal-overlay">
     <div class="modal-content">
         <div class="modal-header">
@@ -586,7 +585,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Leaflet.js Library -->
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
@@ -609,18 +608,18 @@
         const pointSelect = document.getElementById('point_id');
         const managePointsLink = document.getElementById('manage-points-link');
 
-        // Элементы для автокомплита
+
         const destinationInput = document.getElementById('destination_point');
         const destinationAutocomplete = document.getElementById('destination-autocomplete');
         const destinationLatInput = document.getElementById('destination_lat');
         const destinationLonInput = document.getElementById('destination_lon');
         const submitBtn = document.getElementById('submit-order-btn');
 
-        // Состояние редактирования
+
         let isEditingMode = false;
         let editingOrderId = null;
 
-        // Инициализация карты Leaflet для предпросмотра маршрута
+
         let previewMap = null;
         let previewRouteLayer = null;
         let previewMarkersLayer = null;
@@ -636,7 +635,7 @@
             }
         }
 
-        // Debounce функция
+
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -649,7 +648,7 @@
             };
         }
 
-        // Автокомплит для адреса назначения
+
         let selectedDestination = null;
 
         const searchAddresses = debounce(async function (query) {
@@ -692,7 +691,7 @@
             destinationAutocomplete.style.display = 'none';
             selectedDestination = suggestion;
 
-            // Обновить превью маршрута
+
             updateRoutePreview();
         }
 
@@ -703,21 +702,21 @@
             destinationLonInput.value = '';
         });
 
-        // Закрытие автокомплита при клике вне
+
         document.addEventListener('click', (e) => {
             if (!destinationInput.contains(e.target) && !destinationAutocomplete.contains(e.target)) {
                 destinationAutocomplete.style.display = 'none';
             }
         });
 
-        // Обновление предпросмотра маршрута
+
         async function updateRoutePreview() {
             const pointId = pointSelect.value;
             if (!pointId || !selectedDestination) {
                 return;
             }
 
-            // Получить координаты точки отправления
+
             try {
                 const pointResponse = await api.get(`/api/points/${pointId}`);
                 const point = pointResponse.point;
@@ -727,7 +726,7 @@
                     return;
                 }
 
-                // Запросить предпросмотр маршрута
+
                 const routePreview = await fetch('/api/routes/preview', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -742,7 +741,7 @@
                 const routeData = await routePreview.json();
 
                 if (routeData.success && routeData.path) {
-                    // Передаем точку с нормализованными координатами
+
                     const originPoint = {
                         lat: point.latitude,
                         lon: point.longitude,
@@ -755,7 +754,7 @@
             }
         }
 
-        // Слушаем изменение точки отправления и обновляем маршрут
+
         pointSelect.addEventListener('change', function () {
             updateRoutePreview();
         });
@@ -763,13 +762,13 @@
         function displayRouteOnPreviewMap(routeData, origin, destination) {
             initPreviewMap();
 
-            // Очистка предыдущих слоев
+
             if (previewRouteLayer) {
                 previewMap.removeLayer(previewRouteLayer);
             }
             previewMarkersLayer.clearLayers();
 
-            // Маркер точки отправления (A)
+
             const originIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="background: #4CAF50; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">A</div>`,
@@ -781,7 +780,7 @@
                 .bindPopup('<b>Точка отправления</b>')
                 .addTo(previewMarkersLayer);
 
-            // Маркер пункта назначения (B)
+
             const destIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="background: #FF5722; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">B</div>`,
@@ -793,7 +792,7 @@
                 .bindPopup(`<b>Пункт назначения</b><br>${destination.label}`)
                 .addTo(previewMarkersLayer);
 
-            // Отрисовка линии маршрута
+
             if (routeData.path && routeData.path.length > 0) {
                 previewRouteLayer = L.polyline(routeData.path, {
                     color: '#2196F3',
@@ -820,7 +819,7 @@
                 courierSelect.innerHTML = '<option value="">Выберите курьера</option>' +
                     couriers.map(courier => `<option value="${courier.id}">${courier.full_name}</option>`).join('');
 
-                // Заполняем также селектор обязательной машины
+
                 const requiredCourierSelect = document.getElementById('required_courier_id');
                 if (requiredCourierSelect) {
                     const vehicleIcons = {
@@ -881,9 +880,9 @@
             ordersContainer.classList.add('show-add-form');
             setTimeout(() => {
                 createOrderColumn.style.opacity = '1';
-                // Инициализируем карту после того как форма видима
+
                 initPreviewMap();
-                // После инициализации invalidateSize чтобы Leaflet правильно вычислил размеры
+
                 setTimeout(() => {
                     if (previewMap) {
                         previewMap.invalidateSize();
@@ -930,10 +929,10 @@
                 const extra = selected.length > 1 ? ` и еще ${selected.length - 1}` : '';
                 selectedCount.textContent = `Выбрано ${selected.length}: ${preview}${extra}`;
                 selectedOrdersPanel.classList.add('active');
-                // selectedOrdersPanel.style.display = 'block'; // Removed inline style manipulation
+
             } else {
                 selectedOrdersPanel.classList.remove('active');
-                // setTimeout(() => { selectedOrdersPanel.style.display = 'none'; }, 300); // Handled by CSS opacity
+
             }
         }
 
@@ -959,7 +958,7 @@
 
             if (confirm(`Удалить ${selected.length} ${selected.length === 1 ? 'заказ' : 'заказов'}?`)) {
                 try {
-                    // Используем api.request для включения JWT токена
+
                     const result = await api.request('/api/orders/batch', {
                         method: 'DELETE',
                         body: JSON.stringify({ ids: selected })
@@ -983,7 +982,7 @@
             }
         });
 
-        // Изменение статуса заказа
+
         changeStatusBtn.addEventListener('click', function () {
             const selected = Array.from(document.querySelectorAll('input[name="selected_order"]:checked'))
                 .map(radio => radio.value);
@@ -993,12 +992,12 @@
                 return;
             }
 
-            // Создаем модальное окно для выбора статуса
+
             showStatusModal(selected);
         });
 
         function showStatusModal(orderIds) {
-            // Создаем overlay
+
             const overlay = document.createElement('div');
             overlay.style.cssText = `
                 position: fixed;
@@ -1013,7 +1012,7 @@
                 z-index: 10000;
             `;
 
-            // Создаем modal
+
             const modal = document.createElement('div');
             modal.style.cssText = `
                 background: rgba(255, 255, 255, 0.75);
@@ -1075,7 +1074,7 @@
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
-            // Hover эффект для кнопок
+
             modal.querySelectorAll('.status-option-btn').forEach(btn => {
                 btn.addEventListener('mouseenter', () => {
                     btn.style.background = 'var(--hover-bg)';
@@ -1092,7 +1091,7 @@
                 });
             });
 
-            // Закрытие модала
+
             document.getElementById('cancel-status-modal').addEventListener('click', () => {
                 document.body.removeChild(overlay);
             });
@@ -1107,7 +1106,7 @@
         async function changeOrdersStatus(orderIds, newStatus) {
             try {
                 for (const orderId of orderIds) {
-                    // Используем api.put для включения JWT токена
+
                     const result = await api.put(`/api/orders/${orderId}`, { status: newStatus });
 
                     if (!result.success) {
@@ -1117,7 +1116,7 @@
 
                 showNotification(`Статус изменен для ${orderIds.length} заказов`, 'success');
 
-                // Перезагрузка заказов
+
                 const ordersResponse = await api.get('/api/orders');
                 updateOrdersTable(ordersResponse.orders || []);
                 updateSelectedPanel();
@@ -1127,7 +1126,7 @@
             }
         }
 
-        // Редактирование заказа
+
         editOrderBtn.addEventListener('click', async function () {
             const selected = document.querySelector('input[name="selected_order"]:checked');
             if (!selected) {
@@ -1149,11 +1148,11 @@
                     return;
                 }
 
-                // Переключаем в режим редактирования
+
                 isEditingMode = true;
                 editingOrderId = orderId;
 
-                // Заполняем форму данными заказа
+
                 document.getElementById('order_name').value = order.order_name || '';
                 document.getElementById('destination_point').value = order.address || '';
                 document.getElementById('destination_lat').value = order.lat || '';
@@ -1167,7 +1166,7 @@
                     };
                 }
 
-                // Заполняем остальные поля
+
                 document.getElementById('visit_date').value = order.visit_date || '';
                 document.getElementById('visit_time').value = order.visit_time || '';
                 document.getElementById('time_at_point').value = order.time_at_point || '';
@@ -1176,7 +1175,7 @@
                 document.getElementById('recipient_phone').value = order.recipient_phone || '';
                 document.getElementById('comment').value = order.comment || '';
 
-                // Выбираем point и courier если есть
+
                 if (order.point_id) {
                     document.getElementById('point_id').value = order.point_id;
                 }
@@ -1184,14 +1183,14 @@
                     document.getElementById('courier_id').value = order.courier_id;
                 }
 
-                // Меняем текст кнопки и заголовок
+
                 submitBtn.textContent = 'Сохранить изменения';
                 document.querySelector('#create-order-column .page-title').textContent = 'Редактирование заказа';
 
-                // Открываем форму
+
                 openCreateOrderForm();
 
-                // Пытаемся обновить preview маршрута
+
                 if (order.point_id && selectedDestination) {
                     await updateRoutePreview();
                 }
@@ -1207,12 +1206,12 @@
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
 
-            // Определяем метод и URL в зависимости от режима
+
             const method = isEditingMode ? 'PUT' : 'POST';
             const url = isEditingMode ? `/api/orders/${editingOrderId}` : '/api/orders';
 
             try {
-                // Используем api helper для включения JWT токена
+
                 let result;
                 if (isEditingMode) {
                     result = await api.put(url, data);
@@ -1227,12 +1226,12 @@
                     closeCreateOrderForm();
                     resetEditMode();
 
-                    // Перезагружаем список заказов
+
                     const ordersResponse = await api.get('/api/orders');
                     updateOrdersTable(ordersResponse.orders || []);
                     updateRadioButtons();
 
-                    // Редирект на оптимизацию при создании нового заказа
+
                     if (!isEditingMode && result.id) {
                         setTimeout(() => {
                             window.location.href = `/optimization#order=${result.id}`;
@@ -1247,7 +1246,7 @@
             }
         });
 
-        // Сброс режима редактирования
+
         function resetEditMode() {
             isEditingMode = false;
             editingOrderId = null;
@@ -1255,7 +1254,7 @@
             submitBtn.textContent = 'Создать';
             document.querySelector('#create-order-column .page-title').textContent = 'Создание заказа';
 
-            // Очистка карты
+
             if (previewMap) {
                 if (previewRouteLayer) {
                     previewMap.removeLayer(previewRouteLayer);
@@ -1283,7 +1282,7 @@
 
         updateSelectedPanel();
 
-        // Функция генерации HTML для таблицы заказов (без вставки в DOM)
+
         function generateOrdersHtml(orders = []) {
             if (!orders.length) {
                 return `
@@ -1308,7 +1307,7 @@
                 const recipientPhone = order.recipient_phone || '—';
                 const statusBadge = getStatusBadge(order.status);
 
-                // Иконка типа заказа
+
                 const orderType = order.type || 'delivery';
                 const typeIcon = orderType === 'pickup'
                     ? '<i class="fi fi-sr-arrow-up" style="color: #22c55e;" title="Забор"></i>'
@@ -1351,16 +1350,16 @@
             return `<span class="status-badge ${className}">${text}</span>`;
         }
 
-        // === SILENT POLLING (Тихое обновление) ===
 
-        // === SMART POLLING (Точечное обновление) ===
+
+
 
         async function refreshOrdersSmart() {
             try {
                 const response = await api.get('/api/orders');
                 const newOrders = response.orders || [];
 
-                // 1. Создаем Map существующих строк для быстрого поиска
+
                 const existingRows = new Map();
                 document.querySelectorAll('#orders-table-body tr[data-order-row]').forEach(row => {
                     const idInput = row.querySelector('input[name="selected_order"]');
@@ -1369,13 +1368,13 @@
                     }
                 });
 
-                // Set для отслеживания обработанных ID (чтобы потом удалить лишние)
+
                 const processedIds = new Set();
 
-                // 2. Итерируем по новым данным
+
                 newOrders.forEach(order => {
-                    const orderId = order.id; // Предполагаем, что ID всегда есть и стабилен
-                    if (!orderId) return; // Пропуск если нет ID
+                    const orderId = order.id;
+                    if (!orderId) return;
 
                     processedIds.add(orderId.toString());
 
@@ -1391,16 +1390,16 @@
                     const recipientPhone = order.recipient_phone || '—';
                     const statusBadge = getStatusBadge(order.status);
 
-                    // Иконка типа заказа
+
                     const orderType = order.type || 'delivery';
                     const typeIcon = orderType === 'pickup'
                         ? '<i class="fi fi-sr-arrow-up" style="color: #22c55e;" title="Забор"></i>'
                         : '<i class="fi fi-sr-arrow-down" style="color: #3b82f6;" title="Доставка"></i>';
 
-                    // Данные для ячеек (по порядку столбцов)
-                    // Index 0 - Radio button (не трогаем при обновлении)
+
+
                     const cellData = [
-                        null, // Radio (skip)
+                        null,
                         typeIcon,
                         `<strong>${orderName}</strong>`,
                         pointAddress,
@@ -1418,20 +1417,20 @@
                     let row = existingRows.get(orderId.toString());
 
                     if (row) {
-                        // === UPDATE EXISTING ROW ===
+
                         const cells = row.cells;
 
-                        // Итерируем по ячейкам, начиная с 1 (пропускаем чекбокс)
+
                         for (let i = 1; i < cells.length; i++) {
                             const newData = cellData[i];
-                            // Если контент отличается - обновляем
-                            // Используем trim() для надежности сравнения
+
+
                             if (cells[i].innerHTML.trim() !== newData.trim()) {
                                 cells[i].innerHTML = newData;
                             }
                         }
                     } else {
-                        // === CREATE NEW ROW ===
+
                         row = document.createElement('tr');
                         row.setAttribute('data-order-row', '');
 
@@ -1452,19 +1451,19 @@
 
                         ordersTableBody.appendChild(row);
 
-                        // Нужно навесить слушатели на новый input
-                        updateRadioButtons(); // Это переназначит всем, можно оптимизировать, но пока ок
+
+                        updateRadioButtons();
                     }
                 });
 
-                // 3. Удаляем строки, которых нет в новых данных
+
                 existingRows.forEach((row, id) => {
                     if (!processedIds.has(id)) {
                         row.remove();
                     }
                 });
 
-                // Если таблица пустая
+
                 if (newOrders.length === 0 && ordersTableBody.children.length === 0) {
                     ordersTableBody.innerHTML = `
                         <tr>
@@ -1474,11 +1473,11 @@
                         </tr>
                     `;
                 } else if (newOrders.length > 0 && ordersTableBody.querySelector('td[colspan="12"]')) {
-                    // Удаляем заглушку "нет заказов" если появились заказы
+
                     ordersTableBody.querySelector('td[colspan="12"]').parentNode.remove();
                 }
 
-                // Обновляем панель выделения (вдруг удалили выбранный элемент)
+
                 updateSelectedPanel();
 
             } catch (error) {
@@ -1486,12 +1485,12 @@
             }
         }
 
-        // === ИНИЦИАЛИЗАЦИЯ ===
 
-        // Обновление предпросмотра при выборе точки отправления
+
+
         pointSelect.addEventListener('change', updateRoutePreview);
 
-        // Начальная загрузка данных
+
         try {
             const response = await api.get('/api/orders');
             updateOrdersTable(response.orders || []);
@@ -1499,14 +1498,12 @@
             console.error('Error loading orders:', error);
         }
 
-        // Тихое автообновление (Smart Polling) каждые 3 секунды
+
         setInterval(refreshOrdersSmart, 3000);
 
         await Promise.all([loadCouriers(), loadPoints()]);
 
-        // ============================================
-        // IMPORT MODAL LOGIC
-        // ============================================
+
 
         const importExcelBtn = document.getElementById('import-excel-btn');
         const importModal = document.getElementById('import-modal');
@@ -1519,7 +1516,7 @@
         const selectedFileName = document.getElementById('selected-file-name');
         const importPointSelect = document.getElementById('import-point-id');
 
-        // Загрузка точек для импорта
+
         async function loadPointsForImport() {
             if (!importPointSelect) return;
             try {
@@ -1541,13 +1538,13 @@
             }
         }
 
-        // Открытие модального окна
+
         importExcelBtn?.addEventListener('click', () => {
             importModal.classList.add('active');
-            loadPointsForImport(); // Загружаем список точек
+            loadPointsForImport();
         });
 
-        // Закрытие модального окна
+
         function closeModal() {
             importModal.classList.remove('active');
             resetImportForm();
@@ -1561,14 +1558,14 @@
             }
         });
 
-        // Закрытие по Escape
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && importModal?.classList.contains('active')) {
                 closeModal();
             }
         });
 
-        // Сброс формы
+
         function resetImportForm() {
             if (importForm) importForm.reset();
             if (selectedFileInfo) selectedFileInfo.style.display = 'none';
@@ -1579,12 +1576,12 @@
             }
         }
 
-        // Клик по области загрузки
+
         uploadArea?.addEventListener('click', () => {
             fileInput?.click();
         });
 
-        // Drag and Drop
+
         uploadArea?.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('drag-over');
@@ -1604,7 +1601,7 @@
                 const file = files[0];
                 if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
                     handleFileSelect(file);
-                    // Устанавливаем файл в input
+
                     const dataTransfer = new DataTransfer();
                     dataTransfer.items.add(file);
                     fileInput.files = dataTransfer.files;
@@ -1614,7 +1611,7 @@
             }
         });
 
-        // Выбор файла через input
+
         fileInput?.addEventListener('change', (e) => {
             const file = e.target.files?.[0];
             if (file) {
@@ -1622,14 +1619,14 @@
             }
         });
 
-        // Обработка выбранного файла
+
         function handleFileSelect(file) {
             selectedFileName.textContent = file.name;
             selectedFileInfo.style.display = 'flex';
             uploadBtn.disabled = false;
         }
 
-        // Отправка формы
+
         importForm?.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -1639,14 +1636,14 @@
                 return;
             }
 
-            // Проверка выбора точки
+
             const selectedPointId = importPointSelect?.value;
             if (!selectedPointId) {
                 showNotification('Выберите точку отправления', 'error');
                 return;
             }
 
-            // Показываем спиннер
+
             uploadBtn.innerHTML = '<div class="spinner"></div><span>Загрузка...</span>';
             uploadBtn.classList.add('loading');
             uploadBtn.disabled = true;
@@ -1656,7 +1653,7 @@
                 formData.append('file', file);
                 formData.append('point_id', selectedPointId);
 
-                // Добавляем JWT токен для авторизации
+
                 const headers = {};
                 const token = api.getToken();
                 if (token) {
@@ -1674,7 +1671,7 @@
                 if (result.success) {
                     showNotification(result.message, 'success');
                     closeModal();
-                    // Перезагружаем страницу для отображения новых заказов
+
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);

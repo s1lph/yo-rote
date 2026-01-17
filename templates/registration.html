@@ -74,7 +74,7 @@
 
 {% block extra_js %}
 <script>
-    // TextType Component (vanilla JS version)
+
     class TextType {
         constructor(element, options = {}) {
             this.element = element;
@@ -177,7 +177,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        // Initialize TextType animation
+
         const textTypeElement = document.getElementById('text-type');
         if (textTypeElement) {
             new TextType(textTypeElement, {
@@ -197,9 +197,9 @@
             termsLink.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                // Можно открыть модальное окно или перейти на страницу с условиями
+
                 alert('Условия использования (здесь будет ссылка на полный текст)');
-                // Или: window.open('/terms', '_blank');
+
             });
         }
 
@@ -209,16 +209,16 @@
                 const formData = new FormData(this);
                 const data = Object.fromEntries(formData);
 
-                // Проверка совпадения паролей
+
                 if (data.password !== data.password_confirm) {
                     showNotification('Пароли не совпадают', 'error');
                     return;
                 }
 
-                // Удаляем password_confirm перед отправкой
+
                 delete data.password_confirm;
 
-                // Преобразуем terms в boolean
+
                 data.terms = data.terms === 'on';
 
                 try {
@@ -228,20 +228,17 @@
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(data),
-                        credentials: 'include'  // Важно для работы с сессиями
+                        credentials: 'include'  
                     });
 
                     const result = await response.json();
 
                     if (result.success) {
-                        // Сохраняем JWT токен
                         if (result.token) {
                             api.setToken(result.token);
                         }
 
                         showNotification('Компания успешно создана', 'success');
-
-                        // Редирект после успешной регистрации
                         const redirect = this.dataset.redirect || '/orders';
                         setTimeout(() => {
                             window.location.href = redirect;

@@ -1,13 +1,13 @@
-// Основные функции для работы с UI
+
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Инициализация всех компонентов
+    
     initTabs();
     initPopups();
     initForms();
 });
 
-// Работа с табами
+
 function initTabs() {
     const tabs = document.querySelectorAll('.tab');
     tabs.forEach(tab => {
@@ -20,7 +20,7 @@ function initTabs() {
     });
 }
 
-// Работа с попапами
+
 function initPopups() {
     const popupTriggers = document.querySelectorAll('[data-popup]');
     const popupCloses = document.querySelectorAll('.popup-close');
@@ -44,7 +44,7 @@ function initPopups() {
         });
     });
 
-    // Закрытие по клику вне попапа
+    
     document.querySelectorAll('.popup').forEach(popup => {
         popup.addEventListener('click', function (e) {
             if (e.target === this) {
@@ -54,7 +54,7 @@ function initPopups() {
     });
 }
 
-// Работа с формами
+
 function initForms() {
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
@@ -67,7 +67,7 @@ function initForms() {
     });
 }
 
-// Обработка отправки формы
+
 async function handleFormSubmit(form) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
@@ -80,7 +80,7 @@ async function handleFormSubmit(form) {
     }
 
     try {
-        // Используем api.request для включения JWT токена
+        
         const result = await api.request(action, {
             method: method,
             body: JSON.stringify(data)
@@ -102,7 +102,7 @@ async function handleFormSubmit(form) {
     }
 }
 
-// Показ уведомлений с красивой анимацией
+
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
@@ -145,31 +145,31 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
-// Функция применения темы (глобальная)
+
 function applyTheme(theme) {
     document.body.classList.remove('theme-light', 'theme-dark');
     document.body.classList.add(`theme-${theme}`);
     localStorage.setItem('theme', theme);
 }
 
-// API функции с поддержкой JWT токенов
+
 const api = {
-    // Получение токена из localStorage
+    
     getToken() {
         return localStorage.getItem('auth_token');
     },
 
-    // Сохранение токена в localStorage
+    
     setToken(token) {
         localStorage.setItem('auth_token', token);
     },
 
-    // Удаление токена из localStorage
+    
     clearToken() {
         localStorage.removeItem('auth_token');
     },
 
-    // Базовый метод для всех запросов
+    
     async request(url, options = {}) {
         const token = this.getToken();
         const headers = {
@@ -177,7 +177,7 @@ const api = {
             ...options.headers
         };
 
-        // Добавляем токен если есть
+        
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
@@ -185,10 +185,10 @@ const api = {
         try {
             const response = await fetch(url, { ...options, headers });
 
-            // Авто-редирект на логин при 401
+            
             if (response.status === 401) {
                 this.clearToken();
-                // Не редиректим если уже на странице логина или регистрации
+                
                 if (!window.location.pathname.includes('/login') &&
                     !window.location.pathname.includes('/registration')) {
                     window.location.href = '/login';
@@ -226,7 +226,7 @@ const api = {
     }
 };
 
-// Добавление анимаций для уведомлений
+
 const style = document.createElement('style');
 style.textContent = `
     @keyframes slideInNotification {

@@ -73,7 +73,6 @@
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
-        // Применяем сохранённую тему при загрузке страницы
         (function () {
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.body.classList.add(`theme-${savedTheme}`);

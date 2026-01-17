@@ -5,7 +5,7 @@
 
 {% block content %}
 <div class="account-layout">
-    <!-- Левая колонка: Формы редактирования -->
+
     <div class="form-container account-forms" style="max-width: 600px; flex: 1;">
         <div class="page-header">
             <h1 class="page-title"><i class="fi fi-sr-user" style="color: var(--primary-blue);"></i> Настройки аккаунта
@@ -76,7 +76,7 @@
             </p>
 
             <div id="telegram-status">
-                <!-- Статус загружается через JS -->
+
             </div>
 
             <button type="button" class="btn btn-primary" id="telegram-link-btn" style="margin-top: 12px;">
@@ -100,7 +100,7 @@
         </div>
     </div>
 
-    <!-- Правая колонка: Карточка профиля -->
+
     <div class="profile-card-wrapper">
         <div class="profile-card">
             <div class="profile-card-header">
@@ -363,7 +363,7 @@
     document.addEventListener('DOMContentLoaded', async function () {
         const profileForm = document.getElementById('account-profile-form');
 
-        // Функция обновления отображения профиля
+
         function updateProfileDisplay(profile) {
             document.getElementById('display_company_name').textContent = profile.company_name || '—';
             document.getElementById('display_email').textContent = profile.email || '—';
@@ -371,7 +371,7 @@
             document.getElementById('display_activity').textContent = profile.activity || '—';
         }
 
-        // Загрузка данных профиля
+
         try {
             const response = await api.get('/api/account/profile');
             if (response.profile) {
@@ -381,14 +381,14 @@
                 profileForm.querySelector('#profile_phone').value = profile.phone || '';
                 profileForm.querySelector('#profile_activity').value = profile.activity || '';
 
-                // Обновляем карточку профиля
+
                 updateProfileDisplay(profile);
             }
         } catch (error) {
             console.error('Error loading account profile:', error);
         }
 
-        // Обновление карточки при изменении полей формы
+
         const inputFields = ['profile_company_name', 'profile_email', 'profile_phone', 'profile_activity'];
         inputFields.forEach(fieldId => {
             const input = document.getElementById(fieldId);
@@ -404,7 +404,7 @@
             }
         });
 
-        // Выход из аккаунта
+
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', async function () {
@@ -418,7 +418,7 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            // Удаляем JWT токен из localStorage
+
                             api.clearToken();
 
                             showNotification('Выход выполнен', 'success');
@@ -436,7 +436,7 @@
             });
         }
 
-        // Привязка Telegram
+
         const telegramLinkBtn = document.getElementById('telegram-link-btn');
         const telegramCodeBlock = document.getElementById('telegram-code-block');
         const telegramCode = document.getElementById('telegram-code');

@@ -40,7 +40,6 @@
 {% block extra_js %}
 <script>
     {% if token %}
-    // Сохраняем токен в localStorage и редиректим
     (function () {
         const token = '{{ token }}';
         if (token && typeof api !== 'undefined') {

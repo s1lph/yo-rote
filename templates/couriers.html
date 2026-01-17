@@ -24,7 +24,7 @@
                     </tr>
                 </thead>
                 <tbody id="couriers-table-body">
-                    <!-- Курьеры загружаются через JavaScript -->
+
                 </tbody>
             </table>
         </div>
@@ -33,7 +33,7 @@
             Добавить курьера</button>
     </div>
 
-    <!-- Форма добавления/редактирования курьера (скрыта по умолчанию, открывается справа) -->
+
     <div class="column" id="add-courier-column" style="display: none; opacity: 0;">
         <div class="page-header">
             <button class="back-button" id="close-add-courier-btn">←</button>
@@ -84,7 +84,7 @@
     </div>
 </div>
 
-<!-- Панель действий для выбранного курьера -->
+
 <div id="selected-courier-panel" class="selection-panel">
     <div class="selection-panel-content">
         <span id="selected-courier-text" class="selection-panel-text">Выбран 1 курьер</span>
@@ -105,7 +105,7 @@
     </div>
 </div>
 
-<!-- Popup с инструкцией для водителя -->
+
 <div class="popup" id="auth-instruction-popup">
     <div class="popup-content">
         <button class="popup-close">&times;</button>
@@ -123,7 +123,7 @@
     </div>
 </div>
 
-<!-- Инструкция для администратора -->
+
 <div
     style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05)); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 20px; margin: 24px 0; max-width: 600px;">
     <h3 style="margin: 0 0 12px 0; font-size: 16px; color: var(--text-primary);">
@@ -143,9 +143,9 @@
 
 {% block extra_js %}
 <script>
-    // Загрузка курьеров
+
     document.addEventListener('DOMContentLoaded', async function () {
-        // Элементы для работы с курьерами
+
         const addCourierBtn = document.getElementById('add-courier-btn');
         const addCourierColumn = document.getElementById('add-courier-column');
         const closeAddCourierBtn = document.getElementById('close-add-courier-btn');
@@ -159,7 +159,7 @@
         const courierForm = document.getElementById('courier-form');
         const couriersTableBody = document.getElementById('couriers-table-body');
 
-        // Маппинг типов транспорта для отображения
+
         const vehicleTypeMap = {
             'car': 'Легковой автомобиль',
             'truck': 'Грузовик',
@@ -167,7 +167,7 @@
             'scooter': 'Скутер'
         };
 
-        // Обработка выбора курьера
+
         function updateSelectedCourierPanel() {
             const selected = document.querySelector('input[name="selected_courier"]:checked');
             if (selected) {
@@ -179,7 +179,7 @@
             }
         }
 
-        // Обновление обработчиков при изменении таблицы
+
         function updateRadioButtons() {
             const radioButtons = document.querySelectorAll('input[name="selected_courier"]');
             radioButtons.forEach(radio => {
@@ -189,13 +189,13 @@
             });
         }
 
-        // === SMART POLLING (Точечное обновление) ===
+
         async function refreshCouriersSmart() {
             try {
                 const response = await api.get('/api/couriers');
                 const couriers = response.couriers || [];
 
-                // 1. Map existing rows
+
                 const existingRows = new Map();
                 document.querySelectorAll('#couriers-table-body tr[data-courier-id]').forEach(row => {
                     const id = row.getAttribute('data-courier-id');
@@ -204,7 +204,7 @@
 
                 const processedIds = new Set();
 
-                // Helper for telegram status
+
                 const getTelegramStatus = (c) => {
                     if (c.telegram_connected) {
                         return '<span style="color: #22c55e;" title="Бот привязан">✅ Привязан</span>';
@@ -214,13 +214,13 @@
                     return '<span style="color: var(--text-secondary);">---</span>';
                 };
 
-                // 2. Process new data
+
                 couriers.forEach(courier => {
                     const id = courier.id.toString();
                     processedIds.add(id);
 
                     const cellData = [
-                        null, // Radio
+                        null,
                         courier.full_name || '',
                         vehicleTypeMap[courier.vehicle_type] || courier.vehicle_type || '',
                         courier.phone || '',
@@ -232,7 +232,7 @@
                     let row = existingRows.get(id);
 
                     if (row) {
-                        // Update existing
+
                         const cells = row.cells;
                         for (let i = 1; i < cells.length; i++) {
                             const newData = cellData[i];
@@ -241,7 +241,7 @@
                             }
                         }
                     } else {
-                        // Create new
+
                         row = document.createElement('tr');
                         row.setAttribute('data-courier-id', id);
                         row.innerHTML = `
@@ -258,12 +258,12 @@
                     }
                 });
 
-                // 3. Remove deleted
+
                 existingRows.forEach((row, id) => {
                     if (!processedIds.has(id)) row.remove();
                 });
 
-                // Empty state handling
+
                 const hasRows = couriersTableBody.querySelectorAll('tr[data-courier-id]').length > 0;
                 const emptyRow = couriersTableBody.querySelector('tr:not([data-courier-id])');
 
@@ -280,7 +280,7 @@
             }
         }
 
-        // Рендеринг курьеров в таблицу (Initial load)
+
         function renderCouriers(couriers) {
             if (!couriers || couriers.length === 0) {
                 couriersTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px;">Курьеров пока нет</td></tr>';
@@ -288,7 +288,7 @@
             }
 
             couriersTableBody.innerHTML = couriers.map(courier => {
-                // Формируем статус Telegram
+
                 let telegramStatus = '';
                 if (courier.telegram_connected) {
                     telegramStatus = '<span style="color: #22c55e;" title="Бот привязан">✅ Привязан</span>';
@@ -315,7 +315,7 @@
             updateSelectedCourierPanel();
         }
 
-        // Загрузка курьеров из API
+
         try {
             const couriersData = await api.get('/api/couriers');
             renderCouriers(couriersData.couriers || []);
@@ -324,20 +324,20 @@
             renderCouriers([]);
         }
 
-        // Auto-refresh every 3s
+
         setInterval(refreshCouriersSmart, 3000);
 
-        // Инициализация обработчиков
+
         updateRadioButtons();
         updateSelectedCourierPanel();
 
-        // Очистка выбора
+
         clearCourierSelection.addEventListener('click', function () {
             document.querySelectorAll('input[name="selected_courier"]').forEach(radio => radio.checked = false);
             updateSelectedCourierPanel();
         });
 
-        // Редактирование курьера
+
         editCourierBtn.addEventListener('click', function () {
             const selected = document.querySelector('input[name="selected_courier"]:checked');
             if (!selected) return;
@@ -349,12 +349,12 @@
             const phone = row.cells[3].textContent;
             const telegram = row.cells[4].textContent;
 
-            // Заполняем форму данными выбранного курьера
+
             document.getElementById('full_name').value = courierName;
             document.getElementById('phone').value = phone;
             document.getElementById('telegram').value = telegram;
 
-            // Находим значение типа транспорта
+
             let vehicleValue = '';
             for (const [key, value] of Object.entries(vehicleTypeMap)) {
                 if (value === vehicleType) {
@@ -364,14 +364,14 @@
             }
             document.getElementById('vehicle_type').value = vehicleValue;
 
-            // Меняем заголовок формы на "Редактирование курьера"
+
             const formTitle = addCourierColumn.querySelector('.page-title');
             formTitle.textContent = 'Редактирование курьера';
 
-            // Сохраняем ID курьера для обновления
+
             courierForm.dataset.editId = courierId;
 
-            // Показываем форму справа
+
             addCourierColumn.style.display = 'block';
             couriersContainer.classList.add('show-add-form');
             setTimeout(() => {
@@ -379,7 +379,7 @@
             }, 10);
         });
 
-        // Удаление курьера
+
         deleteCourierBtn.addEventListener('click', async function () {
             const selected = document.querySelector('input[name="selected_courier"]:checked');
             if (!selected) return;
@@ -390,12 +390,12 @@
 
             if (confirm(`Удалить курьера "${courierName}"?`)) {
                 try {
-                    // Используем api.delete для включения JWT токена
+
                     const result = await api.delete(`/api/couriers/${courierId}`);
 
                     if (result.success) {
                         showNotification('Курьер успешно удален', 'success');
-                        // Удаляем строку из таблицы
+
                         row.remove();
                         updateSelectedCourierPanel();
                         updateRadioButtons();
@@ -409,7 +409,7 @@
             }
         });
 
-        // Генерация нового кода
+
         regenerateCodeBtn.addEventListener('click', async function () {
             const selected = document.querySelector('input[name="selected_courier"]:checked');
             if (!selected) return;
@@ -420,12 +420,12 @@
 
             if (confirm(`Сгенерировать новый код для "${courierName}"?\n\nТекущая привязка Telegram будет сброшена.`)) {
                 try {
-                    // Используем api.post для включения JWT токена
+
                     const result = await api.post(`/api/couriers/${courierId}/regenerate-code`, {});
 
                     if (result.success) {
                         showNotification(`Новый код: ${result.auth_code}`, 'success');
-                        // Перезагружаем список курьеров
+
                         const couriersData = await api.get('/api/couriers');
                         renderCouriers(couriersData.couriers || []);
                     } else {
@@ -438,9 +438,9 @@
             }
         });
 
-        // Обработка кнопки "Добавить курьера"
+
         addCourierBtn.addEventListener('click', function () {
-            // Сбрасываем форму и заголовок
+
             courierForm.reset();
             courierForm.removeAttribute('data-edit-id');
             const formTitle = addCourierColumn.querySelector('.page-title');
@@ -457,7 +457,7 @@
             closeAddCourierForm();
         });
 
-        // Функция закрытия формы добавления/редактирования курьера
+
         function closeAddCourierForm() {
             addCourierColumn.style.opacity = '0';
             setTimeout(() => {
@@ -470,11 +470,11 @@
             }, 300);
         }
 
-        // Обработка формы добавления/редактирования курьера
+
         courierForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
-            // Предотвращаем двойную отправку
+
             if (this.dataset.submitting === 'true') return;
             this.dataset.submitting = 'true';
 
@@ -485,7 +485,7 @@
             try {
                 const url = editId ? `/api/couriers/${editId}` : '/api/couriers';
 
-                // Используем api helper для включения JWT токена
+
                 let result;
                 if (editId) {
                     result = await api.put(url, data);
@@ -497,7 +497,7 @@
                     showNotification(editId ? 'Курьер успешно изменен' : 'Курьер успешно добавлен', 'success');
                     closeAddCourierForm();
 
-                    // Перезагружаем список курьеров
+
                     const couriersData = await api.get('/api/couriers');
                     renderCouriers(couriersData.couriers || []);
                 } else {

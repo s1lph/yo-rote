@@ -1,5 +1,3 @@
-
-
 import asyncio
 import os
 import sys
@@ -25,18 +23,18 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
-# Загрузка переменных окружения
+
 load_dotenv()
 
-# Получение токена бота
+
 BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 
-# IDs администраторов для тревожных уведомлений (через запятую)
-# Можно указать несколько ID: 123456789,987654321
+
+
 ADMIN_IDS_STR = os.getenv('TG_ADMIN_ID', '123456789')
 ADMIN_IDS = [int(x.strip()) for x in ADMIN_IDS_STR.split(',') if x.strip().isdigit()]
 
-# Путь для сохранения фото подтверждений
+
 PROOFS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'proofs')
 
 if not BOT_TOKEN:
@@ -44,40 +42,40 @@ if not BOT_TOKEN:
     print("   Добавьте TG_BOT_TOKEN=your_token в файл .env")
     sys.exit(1)
 
-# Добавляем путь к проекту для импорта Flask моделей
+
 sys.path.insert(0, os.path.dirname(__file__))
 
-# Инициализация бота и диспетчера
+
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 
-# ============================================================================
-# FSM States
-# ============================================================================
+
+
+
 
 class DeliveryStates(StatesGroup):
     """Состояния для процесса доставки"""
-    waiting_photo_proof = State()    # Ожидание фото подтверждения
-    waiting_failure_reason = State() # Ожидание причины отказа
+    waiting_photo_proof = State()    
+    waiting_failure_reason = State() 
 
 
 class AdminStates(StatesGroup):
     """Состояния для админ-панели"""
-    waiting_broadcast_message = State()  # Ожидание текста рассылки
-    waiting_alert_message = State()      # Ожидание текста тревоги
+    waiting_broadcast_message = State()  
+    waiting_alert_message = State()      
 
 
 class OwnerStates(StatesGroup):
     """Состояния для панели владельца"""
-    waiting_broadcast_message = State()  # Ожидание текста рассылки
-    waiting_alert_message = State()      # Ожидание текста тревоги
+    waiting_broadcast_message = State()  
+    waiting_alert_message = State()      
 
 
-# ============================================================================
-# Helper Functions
-# ============================================================================
+
+
+
 
 def get_flask_app():
     """Получение Flask-приложения для работы с контекстом БД"""
@@ -105,11 +103,11 @@ def sanitize_filename(name: str) -> str:
     Заменяет недопустимые символы на дефис.
     """
     import re
-    # Заменяем недопустимые символы файловой системы на дефис
+    
     safe_name = re.sub(r'[\\/*?"<>|:]+', '-', name)
-    # Удаляем пробелы по краям и заменяем множественные пробелы
+    
     safe_name = re.sub(r'\s+', '_', safe_name.strip())
-    # Ограничиваем длину
+    
     return safe_name[:50] if len(safe_name) > 50 else safe_name
 
 
@@ -129,12 +127,12 @@ def check_and_complete_route(route_id: int) -> bool:
         if not route or route.status != 'active':
             return False
         
-        # Получаем все заказы маршрута
+        
         orders = Order.query.filter_by(route_id=route_id).all()
         if not orders:
             return False
         
-        # Проверяем, все ли заказы завершены
+        
         all_done = all(o.status in ['completed', 'failed'] for o in orders)
         
         if all_done:
@@ -146,9 +144,9 @@ def check_and_complete_route(route_id: int) -> bool:
         return False
 
 
-# ============================================================================
-# Keyboard Generators
-# ============================================================================
+
+
+
 
 def get_main_menu_keyboard(is_on_shift: bool = False, user_id: int = None) -> ReplyKeyboardMarkup:
     """
@@ -168,7 +166,7 @@ def get_main_menu_keyboard(is_on_shift: bool = False, user_id: int = None) -> Re
         [KeyboardButton(text="📋 Мои заказы"), KeyboardButton(text="🆘 Проблема")]
     ]
     
-    # Добавляем кнопку админ-панели для администраторов
+    
     if user_id and user_id in ADMIN_IDS:
         keyboard_rows.append([KeyboardButton(text="🔐 Админ-панель")])
     
@@ -236,28 +234,28 @@ def generate_order_keyboard(
     """
     buttons = []
     
-    # Первый ряд: Доставлен / Отказ
+    
     buttons.append([
         InlineKeyboardButton(text="✅ Доставлен", callback_data=f"delivered:{order_id}"),
         InlineKeyboardButton(text="❌ Отказ", callback_data=f"failed:{order_id}")
     ])
     
-    # Второй ряд: Навигация
+    
     row2 = []
     
-    # Кнопка навигации
+    
     if lat and lon:
-        # Используем Яндекс карты как универсальный вариант (работает и в браузере)
+        
         yandex_maps_url = f"https://yandex.ru/maps/?rtext=~{lat},{lon}&rtt=auto"
         row2.append(InlineKeyboardButton(text="🗺 Навигатор", url=yandex_maps_url))
     elif address:
-        # Если нет координат, используем адрес
+        
         encoded_address = quote(address)
         yandex_maps_url = f"https://yandex.ru/maps/?text={encoded_address}&rtt=auto"
         row2.append(InlineKeyboardButton(text="🗺 Карта", url=yandex_maps_url))
     
-    # Примечание: Telegram не поддерживает tel: URLs в inline кнопках
-    # Телефон показывается в тексте сообщения
+    
+    
     
     if row2:
         buttons.append(row2)
@@ -293,21 +291,21 @@ def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
 
-# ============================================================================
-# Command Handlers
-# ============================================================================
+
+
+
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     """Обработчик команды /start"""
-    # Проверяем, привязан ли уже аккаунт
+    
     app = get_flask_app()
     with app.app_context():
         from models import Courier
         courier = Courier.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
         
         if courier:
-            # Курьер уже привязан
+            
             await message.answer(
                 f"👋 *С возвращением, {courier.full_name}!*\n\n"
                 f"Вы готовы к работе. Используйте меню ниже для управления.",
@@ -315,7 +313,7 @@ async def cmd_start(message: Message):
                 reply_markup=get_main_menu_keyboard(courier.is_on_shift, message.from_user.id)
             )
         else:
-            # Новый пользователь
+            
             welcome_text = """
 👋 *Добро пожаловать в yo.route Bot!*
 
@@ -350,9 +348,9 @@ async def cmd_menu(message: Message):
             )
 
 
-# ============================================================================
-# Admin Panel (Админ-панель)
-# ============================================================================
+
+
+
 
 @dp.message(Command("admin"))
 async def cmd_admin(message: Message):
@@ -403,12 +401,12 @@ async def admin_stats(callback: CallbackQuery):
     with app.app_context():
         from models import Courier, Order, Route
         
-        # Статистика курьеров
+        
         total_couriers = Courier.query.count()
         on_shift = Courier.query.filter_by(is_on_shift=True).count()
         with_telegram = Courier.query.filter(Courier.telegram_chat_id.isnot(None)).count()
         
-        # Статистика заказов за сегодня
+        
         from datetime import date
         today = date.today().isoformat()
         
@@ -502,7 +500,7 @@ async def admin_proofs(callback: CallbackQuery):
     with app.app_context():
         from models import Order, Courier
         
-        # Получаем последние 10 заказов с фото
+        
         orders_with_proofs = Order.query.filter(
             Order.proof_image.isnot(None),
             Order.status == 'completed'
@@ -524,10 +522,10 @@ async def admin_proofs(callback: CallbackQuery):
             await callback.answer()
             return
         
-        # Формируем список кнопок для каждого заказа
+        
         buttons = []
         for order in orders_with_proofs:
-            # Получаем имя курьера
+            
             courier_name = "—"
             if order.route_id:
                 from models import Route
@@ -537,7 +535,7 @@ async def admin_proofs(callback: CallbackQuery):
                     if courier:
                         courier_name = courier.full_name
             
-            # Форматируем дату
+            
             date_str = order.updated_at.strftime('%d.%m %H:%M') if order.updated_at else "—"
             
             button_text = f"📦 {order.order_name[:20]} | {courier_name[:15]} | {date_str}"
@@ -555,7 +553,7 @@ async def admin_proofs(callback: CallbackQuery):
         )
         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
         
-        # Проверяем, является ли сообщение фото
+        
         if callback.message.photo:
             await callback.message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
         else:
@@ -583,14 +581,14 @@ async def view_proof(callback: CallbackQuery):
             await callback.answer("❌ Фото не найдено", show_alert=True)
             return
         
-        # Путь к файлу
+        
         photo_path = os.path.join(os.path.dirname(__file__), 'static', order.proof_image)
         
         if not os.path.exists(photo_path):
             await callback.answer("❌ Файл фото не найден на сервере", show_alert=True)
             return
         
-        # Получаем информацию о курьере
+        
         courier_name = "—"
         if order.route_id:
             route = Route.query.get(order.route_id)
@@ -599,7 +597,7 @@ async def view_proof(callback: CallbackQuery):
                 if courier:
                     courier_name = courier.full_name
         
-        # Формируем подпись
+        
         caption = (
             f"📦 *{order.order_name}*\n\n"
             f"📍 Адрес: {order.address or '—'}\n"
@@ -608,7 +606,7 @@ async def view_proof(callback: CallbackQuery):
             f"⏰ Доставлено: {order.updated_at.strftime('%d.%m.%Y %H:%M') if order.updated_at else '—'}"
         )
         
-        # Отправляем фото
+        
         photo = FSInputFile(photo_path)
         await callback.message.answer_photo(
             photo=photo,
@@ -628,9 +626,9 @@ async def admin_menu(callback: CallbackQuery, state: FSMContext):
     """Вернуться в меню админки"""
     await state.clear()
     
-    # Проверяем, является ли сообщение фото (у него нет текста для редактирования)
+    
     if callback.message.photo:
-        # Если это фото, отправляем новое сообщение
+        
         await callback.message.answer(
             "🔐 *Админ-панель yo.route*\n\n"
             "Выберите действие:",
@@ -638,7 +636,7 @@ async def admin_menu(callback: CallbackQuery, state: FSMContext):
             reply_markup=get_admin_keyboard()
         )
     else:
-        # Если это текстовое сообщение, редактируем его
+        
         await callback.message.edit_text(
             "🔐 *Админ-панель yo.route*\n\n"
             "Выберите действие:",
@@ -669,9 +667,9 @@ async def admin_close(callback: CallbackQuery, state: FSMContext):
     await callback.answer("Админ-панель закрыта")
 
 
-# ============================================================================
-# Admin Message Handlers (FSM)
-# ============================================================================
+
+
+
 
 @dp.message(AdminStates.waiting_broadcast_message, F.text)
 async def process_broadcast_message(message: Message, state: FSMContext):
@@ -686,7 +684,7 @@ async def process_broadcast_message(message: Message, state: FSMContext):
     with app.app_context():
         from models import Courier
         
-        # Получаем всех курьеров с Telegram
+        
         couriers = Courier.query.filter(Courier.telegram_chat_id.isnot(None)).all()
         
         sent_count = 0
@@ -727,7 +725,7 @@ async def process_alert_message(message: Message, state: FSMContext):
     with app.app_context():
         from models import Courier
         
-        # Получаем только курьеров на смене
+        
         couriers = Courier.query.filter(
             Courier.telegram_chat_id.isnot(None),
             Courier.is_on_shift == True
@@ -762,9 +760,9 @@ async def process_alert_message(message: Message, state: FSMContext):
     await state.clear()
 
 
-# ============================================================================
-# Shift Management (Начало/Конец смены)
-# ============================================================================
+
+
+
 
 @dp.message(F.text == "📍 Начал смену")
 async def start_shift(message: Message):
@@ -816,9 +814,9 @@ async def end_shift(message: Message):
         )
 
 
-# ============================================================================
-# Owner Menu Handlers (Меню владельца)
-# ============================================================================
+
+
+
 
 @dp.message(F.text == "📊 Панель управления")
 async def owner_panel(message: Message):
@@ -855,7 +853,7 @@ async def owner_stats(callback: CallbackQuery):
             await callback.answer("❌ Вы не авторизованы как владелец.", show_alert=True)
             return
         
-        # Статистика владельца
+        
         total_couriers = Courier.query.filter_by(user_id=user.id).count()
         on_shift = Courier.query.filter_by(user_id=user.id, is_on_shift=True).count()
         with_telegram = Courier.query.filter(
@@ -863,13 +861,13 @@ async def owner_stats(callback: CallbackQuery):
             Courier.telegram_chat_id.isnot(None)
         ).count()
         
-        # Заказы владельца
+        
         pending_orders = Order.query.filter_by(user_id=user.id, status='planned').count()
         in_progress = Order.query.filter_by(user_id=user.id, status='in_progress').count()
         completed = Order.query.filter_by(user_id=user.id, status='completed').count()
         failed = Order.query.filter_by(user_id=user.id, status='failed').count()
         
-        # Маршруты
+        
         active_routes = Route.query.filter_by(user_id=user.id, status='active').count()
         
         stats_text = (
@@ -964,7 +962,7 @@ async def owner_proofs(callback: CallbackQuery):
             await callback.answer("❌ Вы не авторизованы", show_alert=True)
             return
         
-        # Получаем последние 10 заказов владельца с фото
+        
         orders_with_proofs = Order.query.filter(
             Order.user_id == user.id,
             Order.proof_image.isnot(None),
@@ -984,7 +982,7 @@ async def owner_proofs(callback: CallbackQuery):
             await callback.answer()
             return
         
-        # Формируем список кнопок
+        
         buttons = []
         for order in orders_with_proofs:
             courier_name = "—"
@@ -1137,9 +1135,9 @@ async def owner_unlink_telegram(message: Message):
         )
 
 
-# ============================================================================
-# Owner Message Handlers (FSM)
-# ============================================================================
+
+
+
 
 @dp.message(OwnerStates.waiting_broadcast_message, F.text)
 async def process_owner_broadcast(message: Message, state: FSMContext):
@@ -1157,7 +1155,7 @@ async def process_owner_broadcast(message: Message, state: FSMContext):
     with app.app_context():
         from models import Courier
         
-        # Получаем только курьеров этого владельца
+        
         couriers = Courier.query.filter(
             Courier.user_id == user_id,
             Courier.telegram_chat_id.isnot(None)
@@ -1204,7 +1202,7 @@ async def process_owner_alert(message: Message, state: FSMContext):
     with app.app_context():
         from models import Courier
         
-        # Получаем только курьеров этого владельца на смене
+        
         couriers = Courier.query.filter(
             Courier.user_id == user_id,
             Courier.telegram_chat_id.isnot(None),
@@ -1237,9 +1235,9 @@ async def process_owner_alert(message: Message, state: FSMContext):
     await state.clear()
 
 
-# ============================================================================
-# Live Location Tracking
-# ============================================================================
+
+
+
 
 @dp.message(F.location)
 async def handle_location(message: Message):
@@ -1253,12 +1251,12 @@ async def handle_location(message: Message):
             await message.answer("❌ Вы не авторизованы в системе.")
             return
         
-        # Обновляем координаты
+        
         courier.current_lat = message.location.latitude
         courier.current_lon = message.location.longitude
         db.session.commit()
         
-        # Если это Live Location (есть live_period), подтверждаем один раз
+        
         if message.location.live_period:
             await message.answer(
                 f"📍 *Трансляция геопозиции активна*\n\n"
@@ -1280,12 +1278,12 @@ async def handle_location_update(message: Message):
             courier.current_lat = message.location.latitude
             courier.current_lon = message.location.longitude
             db.session.commit()
-            # Не отправляем сообщение при каждом обновлении чтобы не спамить
+            
 
 
-# ============================================================================
-# Emergency Button (Тревожная кнопка)
-# ============================================================================
+
+
+
 
 @dp.message(F.text == "🆘 Проблема")
 async def emergency_button(message: Message):
@@ -1299,7 +1297,7 @@ async def emergency_button(message: Message):
             await message.answer("❌ Вы не авторизованы в системе.")
             return
         
-        # Формируем сообщение для владельца
+        
         location_info = ""
         if courier.current_lat and courier.current_lon:
             maps_link = f"https://yandex.ru/maps/?pt={courier.current_lon},{courier.current_lat}&z=17"
@@ -1314,11 +1312,11 @@ async def emergency_button(message: Message):
             f"⏰ Время: {datetime.now().strftime('%H:%M:%S %d.%m.%Y')}"
         )
         
-        # Получаем владельца курьера через relationship
+        
         owner = courier.user
         
         if owner and owner.telegram_chat_id:
-            # Отправляем владельцу
+            
             try:
                 await bot.send_message(
                     chat_id=owner.telegram_chat_id,
@@ -1338,7 +1336,7 @@ async def emergency_button(message: Message):
                     parse_mode="Markdown"
                 )
         else:
-            # Владелец не привязал Telegram
+            
             await message.answer(
                 "⚠️ *Ваш диспетчер не привязал Telegram.*\n\n"
                 "Пожалуйста, свяжитесь с ним по телефону или сообщите о необходимости "
@@ -1347,9 +1345,9 @@ async def emergency_button(message: Message):
             )
 
 
-# ============================================================================
-# My Orders
-# ============================================================================
+
+
+
 
 @dp.message(F.text == "📋 Мои заказы")
 async def my_orders(message: Message):
@@ -1368,7 +1366,7 @@ async def my_orders(message: Message):
         
         print(f"[DEBUG] Found courier: {courier.full_name} (id={courier.id})")
         
-        # Получаем активные маршруты
+        
         active_routes = Route.query.filter_by(
             courier_id=courier.id, 
             status='active'
@@ -1392,14 +1390,14 @@ async def my_orders(message: Message):
             if not orders:
                 continue
             
-            # Отправляем информацию о маршруте
+            
             await message.answer(
                 f"🚗 *Маршрут на {route.date}*\n"
                 f"📦 Заказов: {len(orders)}",
                 parse_mode="Markdown"
             )
             
-            # Отправляем каждый заказ с кнопками
+            
             for i, order in enumerate(orders, 1):
                 status_emoji = {
                     'planned': '⏳',
@@ -1423,7 +1421,7 @@ async def my_orders(message: Message):
                 if order.comment:
                     order_text += f"💬 Комментарий: _{order.comment}_\n"
                 
-                # Кнопки только для незавершенных заказов
+                
                 if order.status not in ['completed', 'failed']:
                     print(f"[DEBUG] Sending order {order.id} with keyboard, status={order.status}")
                     keyboard = generate_order_keyboard(
@@ -1440,16 +1438,16 @@ async def my_orders(message: Message):
                     await message.answer(order_text, parse_mode="Markdown")
 
 
-# ============================================================================
-# Callback Handlers (Inline Buttons)
-# ============================================================================
+
+
+
 
 @dp.callback_query(F.data.startswith("delivered:"))
 async def callback_delivered(callback: CallbackQuery, state: FSMContext):
     """Обработка нажатия кнопки 'Доставлен'"""
     order_id = int(callback.data.split(":")[1])
     
-    # Сохраняем order_id в состояние FSM
+    
     await state.update_data(order_id=order_id)
     await state.set_state(DeliveryStates.waiting_photo_proof)
     
@@ -1468,7 +1466,7 @@ async def callback_failed(callback: CallbackQuery, state: FSMContext):
     """Обработка нажатия кнопки 'Отказ'"""
     order_id = int(callback.data.split(":")[1])
     
-    # Сохраняем order_id в состояние FSM
+    
     await state.update_data(order_id=order_id)
     await state.set_state(DeliveryStates.waiting_failure_reason)
     
@@ -1493,9 +1491,9 @@ async def callback_cancel(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ============================================================================
-# Photo Proof Handler (FSM)
-# ============================================================================
+
+
+
 
 @dp.message(DeliveryStates.waiting_photo_proof, F.photo)
 async def process_photo_proof(message: Message, state: FSMContext):
@@ -1508,14 +1506,14 @@ async def process_photo_proof(message: Message, state: FSMContext):
         await state.clear()
         return
     
-    # Создаем директорию если нет
+    
     ensure_proofs_dir()
     
-    # Получаем файл фото (берем самое большое разрешение)
+    
     photo = message.photo[-1]
     file = await bot.get_file(photo.file_id)
     
-    # Обновляем заказ в БД и получаем имя для файла
+    
     app = get_flask_app()
     route_id = None
     order_name = str(order_id)
@@ -1528,16 +1526,16 @@ async def process_photo_proof(message: Message, state: FSMContext):
             order_name = order.order_name or str(order_id)
             route_id = order.route_id
     
-    # Генерируем имя файла с названием заказа
+    
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     safe_name = sanitize_filename(order_name)
     filename = f"{safe_name}_{timestamp}.jpg"
     filepath = os.path.join(PROOFS_DIR, filename)
     
-    # Скачиваем файл
+    
     await bot.download_file(file.file_path, filepath)
     
-    # Обновляем статус заказа в БД
+    
     with app.app_context():
         from models import db, Order
         order = Order.query.get(order_id)
@@ -1554,7 +1552,7 @@ async def process_photo_proof(message: Message, state: FSMContext):
                 parse_mode="Markdown"
             )
             
-            # Проверяем, завершён ли маршрут
+            
             if route_id and check_and_complete_route(route_id):
                 await message.answer(
                     "🏁 *Маршрут завершён!*\n\n"
@@ -1577,14 +1575,14 @@ async def process_photo_proof_invalid(message: Message):
     )
 
 
-# ============================================================================
-# Failure Reason Handler (FSM)
-# ============================================================================
+
+
+
 
 @dp.message(DeliveryStates.waiting_failure_reason, F.text)
 async def process_failure_reason(message: Message, state: FSMContext):
     """Обработка причины отказа"""
-    # Игнорируем команды меню
+    
     if message.text in ["📍 Начал смену", "🏁 Закончил смену", "📋 Мои заказы", "🆘 Проблема"]:
         await message.answer(
             "⚠️ Сначала завершите ввод причины отказа или нажмите 'Отмена'",
@@ -1602,7 +1600,7 @@ async def process_failure_reason(message: Message, state: FSMContext):
     
     reason = message.text.strip()
     
-    # Обновляем заказ в БД
+    
     app = get_flask_app()
     route_id = None
     
@@ -1622,7 +1620,7 @@ async def process_failure_reason(message: Message, state: FSMContext):
                 parse_mode="Markdown"
             )
             
-            # Проверяем, завершён ли маршрут
+            
             if route_id and check_and_complete_route(route_id):
                 await message.answer(
                     "🏁 *Маршрут завершён!*\n\n"
@@ -1635,14 +1633,14 @@ async def process_failure_reason(message: Message, state: FSMContext):
     await state.clear()
 
 
-# ============================================================================
-# Auth Code Handler
-# ============================================================================
+
+
+
 
 @dp.message(F.text)
 async def handle_auth_code(message: Message):
     """Обработчик текстовых сообщений (код авторизации для User или Courier)"""
-    # Игнорируем команды меню
+    
     menu_commands = [
         "📍 Начал смену", "🏁 Закончил смену", "📋 Мои заказы", "🆘 Проблема",
         "📊 Панель управления", "🔗 Отвязать Telegram", "🔐 Админ-панель"
@@ -1652,8 +1650,8 @@ async def handle_auth_code(message: Message):
     
     code = message.text.strip()
     
-    # Проверяем формат кода (12 символов, буквы, цифры, спецсимволы)
-    # Разрешаем буквы, цифры и символы !@#$%&*?
+    
+    
     import re
     if len(code) != 12 or not re.match(r'^[A-Za-z0-9!@#$%&*?]+$', code):
         await message.answer(
@@ -1663,13 +1661,13 @@ async def handle_auth_code(message: Message):
         )
         return
     
-    # Работаем с БД через Flask контекст
+    
     app = get_flask_app()
     
     with app.app_context():
         from models import db, User, Courier
         
-        # Проверяем, не привязан ли уже этот chat_id как Владелец
+        
         existing_user = User.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
         if existing_user:
             await message.answer(
@@ -1680,7 +1678,7 @@ async def handle_auth_code(message: Message):
             )
             return
         
-        # Проверяем, не привязан ли уже этот chat_id как Курьер
+        
         existing_courier = Courier.query.filter_by(telegram_chat_id=str(message.chat.id)).first()
         if existing_courier:
             await message.answer(
@@ -1691,11 +1689,11 @@ async def handle_auth_code(message: Message):
             )
             return
         
-        # Сначала ищем код в User (Владелец бизнеса)
+        
         user = User.query.filter_by(auth_code=code).first()
         if user:
             user.telegram_chat_id = str(message.chat.id)
-            user.auth_code = None  # Очищаем код после использования
+            user.auth_code = None  
             db.session.commit()
             
             await message.answer(
@@ -1708,7 +1706,7 @@ async def handle_auth_code(message: Message):
             )
             return
         
-        # Если не найден в User, ищем в Courier
+        
         courier = Courier.query.filter_by(auth_code=code).first()
         
         if not courier:
@@ -1719,9 +1717,9 @@ async def handle_auth_code(message: Message):
             )
             return
         
-        # Сохраняем chat_id для курьера
+        
         courier.telegram_chat_id = str(message.chat.id)
-        # Очищаем код после успешной привязки
+        
         courier.auth_code = None
         
         db.session.commit()
@@ -1736,9 +1734,9 @@ async def handle_auth_code(message: Message):
         )
 
 
-# ============================================================================
-# Main Entry Point
-# ============================================================================
+
+
+
 
 async def main():
     """Запуск бота в polling режиме (для локальной разработки)"""
@@ -1748,21 +1746,21 @@ async def main():
     print("   Админ-панель: /admin")
     print("   Нажмите Ctrl+C для остановки")
     
-    # Создаем директорию для фото
+    
     ensure_proofs_dir()
     
-    # Удаляем webhook и пропускаем накопившиеся обновления
+    
     await bot.delete_webhook(drop_pending_updates=True)
     
-    # Запуск polling
+    
     await dp.start_polling(bot)
 
 
-# Webhook режим для Railway
-WEBHOOK_PATH = f"/webhook/telegram/{BOT_TOKEN}"
-WEBHOOK_URL = os.getenv('WEBHOOK_URL')  # Например: https://your-app.up.railway.app
 
-# Глобальный event loop для webhook режима
+WEBHOOK_PATH = f"/webhook/telegram/{BOT_TOKEN}"
+WEBHOOK_URL = os.getenv('WEBHOOK_URL')  
+
+
 _webhook_loop = None
 _webhook_thread = None
 
@@ -1811,10 +1809,10 @@ def init_bot_webhook(flask_app):
     import concurrent.futures
     from flask import request, Response
     
-    # Создаем директорию для фото
+    
     ensure_proofs_dir()
     
-    # Инициализируем постоянный event loop
+    
     loop = get_webhook_loop()
     
     @flask_app.route(WEBHOOK_PATH, methods=['POST'])
@@ -1823,14 +1821,14 @@ def init_bot_webhook(flask_app):
         if request.headers.get('content-type') == 'application/json':
             update_data = request.get_json()
             
-            # Запускаем обработку в постоянном event loop
+            
             future = asyncio.run_coroutine_threadsafe(
                 process_webhook_update(update_data),
                 loop
             )
             
             try:
-                # Ждём выполнения с таймаутом 25 секунд
+                
                 future.result(timeout=25)
             except concurrent.futures.TimeoutError:
                 print("[WARN] Webhook update processing timeout")
@@ -1840,7 +1838,7 @@ def init_bot_webhook(flask_app):
             return Response('OK', status=200)
         return Response('Bad Request', status=400)
     
-    # Устанавливаем webhook
+    
     if WEBHOOK_URL:
         future = asyncio.run_coroutine_threadsafe(setup_webhook(), loop)
         try:
@@ -1854,7 +1852,7 @@ def init_bot_webhook(flask_app):
     return True
 
 
-# Импорт threading в начало модуля нужен
+
 import threading
 
 

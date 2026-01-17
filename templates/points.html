@@ -4,11 +4,11 @@
 {% block title %}Точки отправки - yo.route{% endblock %}
 
 {% block extra_css %}
-<!-- Leaflet.js CSS for map -->
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
-    /* Autocomplete dropdown styles */
+
     .autocomplete-dropdown {
         position: absolute;
         top: 100%;
@@ -104,7 +104,7 @@
     </div>
 </div>
 
-<!-- Панель действий для выбранной точки -->
+
 <div id="selected-point-panel" class="selection-panel">
     <div class="selection-panel-content">
         <span id="selected-point-text" class="selection-panel-text">Выбрана 1 точка</span>
@@ -124,7 +124,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Leaflet.js Library -->
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
@@ -157,9 +157,7 @@
             points: []
         };
 
-        // === ФУНКЦИИ СНАЧАЛА ===
 
-        // Debounce функция
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -172,13 +170,13 @@
             };
         }
 
-        // === SMART POLLING (Точечное обновление) ===
+
         async function refreshPointsSmart() {
             try {
                 const { points = [] } = await api.get('/api/points');
                 state.points = points;
 
-                // 1. Map existing items
+
                 const existingItems = new Map();
                 document.querySelectorAll('#points-list .radio-item:has(input)').forEach(item => {
                     const input = item.querySelector('input');
@@ -187,7 +185,7 @@
 
                 const processedIds = new Set();
 
-                // 2. Process new data
+
                 points.forEach(point => {
                     const id = point.id.toString();
                     processedIds.add(id);
@@ -199,33 +197,28 @@
                     `.trim();
 
                     if (item) {
-                        // Update existing
-                        // Update class
                         const isPrimary = point.is_primary;
                         if (item.classList.contains('primary-point') !== isPrimary) {
                             if (isPrimary) item.classList.add('primary-point');
                             else item.classList.remove('primary-point');
                         }
 
-                        // Update label text if changed
+
                         const label = item.querySelector('label');
-                        // Use a temp div to compare HTML content
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = labelContent;
 
-                        // Compare innerText/content to avoid whitespace issues or re-rendering if same
-                        // But here we deal with badge HTML, so innerHTML comparison is needed but normalized
                         if (label.innerHTML.replace(/\s+/g, ' ').trim() !== labelContent.replace(/\s+/g, ' ').trim()) {
                             label.innerHTML = labelContent;
                         }
 
-                        // Update data attributes
+
                         const input = item.querySelector('input');
                         if (input.dataset.address !== point.address) input.dataset.address = point.address;
                         if (input.dataset.primary !== String(point.is_primary)) input.dataset.primary = point.is_primary;
 
                     } else {
-                        // Create new
+
                         const div = document.createElement('div');
                         div.className = `radio-item ${point.is_primary ? 'primary-point' : ''}`;
                         div.innerHTML = `
@@ -236,18 +229,17 @@
                         `;
                         pointsList.appendChild(div);
 
-                        // Add listener
                         const radio = div.querySelector('input');
                         radio.addEventListener('change', updateSelectedPointPanel);
                     }
                 });
 
-                // 3. Remove deleted
+
                 existingItems.forEach((item, id) => {
                     if (!processedIds.has(id)) item.remove();
                 });
 
-                // Empty state handling
+
                 if (points.length === 0) {
                     pointsList.innerHTML = `
                         <div class="radio-item">
@@ -255,7 +247,7 @@
                         </div>
                     `;
                 } else {
-                    // Remove "No points" placeholder if exists and actual points are present
+
                     const placeholder = Array.from(pointsList.children).find(child => !child.querySelector('input'));
                     if (placeholder && pointsList.children.length > 1) {
                         placeholder.remove();
@@ -378,14 +370,14 @@
             }, 300);
         }
 
-        // === ЗАГРУЗКА ДАННЫХ ===
+
         await loadPointsList();
         setInterval(refreshPointsSmart, 3000); // Smart polling every 3s
         handleHashIntent();
 
-        // === АВТОКОМПЛИТ ===
 
-        // Автокомплит для адреса
+
+
         let selectedAddress = null;
 
         const searchAddresses = debounce(async function (query) {
@@ -428,11 +420,10 @@
             addressAutocomplete.style.display = 'none';
             selectedAddress = suggestion;
 
-            // Обновляем карту с новой локацией
             updateMapPreview(suggestion.lat, suggestion.lon, suggestion.label);
         }
 
-        // Инициализация превью карты
+
         function initPreviewMap() {
             if (!previewMap) {
                 previewMap = L.map('point-preview-map').setView([55.7558, 37.6173], 11);
@@ -443,16 +434,15 @@
             }
         }
 
-        // Обновление карты с маркером
+
         function updateMapPreview(lat, lon, label) {
             initPreviewMap();
 
-            // Удаляем предыдущий маркер
+
             if (previewMarker) {
                 previewMap.removeLayer(previewMarker);
             }
 
-            // Создаем иконку маркера
             const markerIcon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="background: #4CAF50; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="fi fi-sr-marker" style="font-size: 14px;"></i></div>`,
@@ -460,12 +450,11 @@
                 iconAnchor: [16, 16]
             });
 
-            // Добавляем маркер
             previewMarker = L.marker([lat, lon], { icon: markerIcon })
                 .bindPopup(`<b>Выбранная локация</b><br>${label}`)
                 .addTo(previewMap);
 
-            // Центрируем карту на маркере
+
             previewMap.setView([lat, lon], 15);
         }
 
@@ -476,7 +465,7 @@
             pointLonInput.value = '';
         });
 
-        // Закрытие автокомплита при клике вне
+
         document.addEventListener('click', (e) => {
             if (!addressInput.contains(e.target) && !addressAutocomplete.contains(e.target)) {
                 addressAutocomplete.style.display = 'none';
@@ -514,7 +503,6 @@
 
             if (confirm(`Удалить точку "${point.address}"?`)) {
                 try {
-                    // Используем api.delete для включения JWT токена
                     const result = await api.delete(`/api/points/${point.id}`);
                     if (result.success) {
                         showNotification('Точка успешно удалена', 'success');
@@ -545,7 +533,7 @@
         addPointForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
-            // Предотвращаем двойную отправку
+
             if (this.dataset.submitting === 'true') return;
             this.dataset.submitting = 'true';
 
@@ -557,7 +545,6 @@
             try {
                 const url = editId ? `/api/points/${editId}` : '/api/points';
 
-                // Используем api helper для включения JWT токена
                 let result;
                 if (editId) {
                     result = await api.put(url, data);

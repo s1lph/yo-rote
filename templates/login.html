@@ -47,7 +47,7 @@
             </a>
         </div>
 
-        <!-- Google OAuth Button -->
+
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
             <p style="color: var(--text-gray); font-size: 13px; margin-bottom: 10px; text-align: center;">
                 Или войдите через
@@ -92,7 +92,7 @@
 
 {% block extra_js %}
 <script>
-    // TextType Component (vanilla JS version)
+
     class TextType {
         constructor(element, options = {}) {
             this.element = element;
@@ -195,7 +195,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        // Initialize TextType animation
+
         const textTypeElement = document.getElementById('text-type');
         if (textTypeElement) {
             new TextType(textTypeElement, {
@@ -215,7 +215,7 @@
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
 
-            // Преобразуем remember в boolean
+
             data.remember = data.remember === 'on';
 
             try {
@@ -225,20 +225,20 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(data),
-                    credentials: 'include'  // Важно для работы с сессиями
+                    credentials: 'include'
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    // Сохраняем JWT токен
+
                     if (result.token) {
                         api.setToken(result.token);
                     }
 
                     showNotification('Вход выполнен успешно', 'success');
 
-                    // Редирект после успешного входа
+
                     const redirect = this.dataset.redirect || '/orders';
                     setTimeout(() => {
                         window.location.href = redirect;

@@ -4,11 +4,10 @@
 {% block title %}Планирование маршрута - yo.route{% endblock %}
 
 {% block extra_css %}
-<!-- Leaflet.js CSS for map -->
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
-    /* ===== Optimization Page Layout ===== */
     .opt-container {
         display: grid;
         grid-template-columns: 400px 1fr;
@@ -17,7 +16,7 @@
         max-width: 100%;
     }
 
-    /* ===== Left Sidebar ===== */
+
     .opt-sidebar {
         background: rgba(255, 255, 255, 0.85);
         backdrop-filter: blur(20px) saturate(180%);
@@ -68,7 +67,7 @@
         font-size: 12px;
     }
 
-    /* ===== Segmented Tabs ===== */
+
     .route-tabs {
         display: flex;
         background: rgba(241, 245, 249, 0.8);
@@ -101,7 +100,7 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
-    /* ===== Routes List ===== */
+
     .opt-routes-list {
         flex: 1;
         overflow-y: auto;
@@ -121,7 +120,7 @@
         border-radius: 3px;
     }
 
-    /* ===== Route Card ===== */
+
     .route-card {
         background: white;
         border-radius: 16px;
@@ -189,7 +188,7 @@
         color: var(--light-blue);
     }
 
-    /* ===== Route Metrics ===== */
+
     .route-metrics {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -244,7 +243,7 @@
         letter-spacing: 0.5px;
     }
 
-    /* ===== Route Card Actions ===== */
+
     .route-card-actions {
         display: flex;
         gap: 10px;
@@ -311,7 +310,7 @@
         border-color: #ef4444;
     }
 
-    /* ===== Right Column - Map Area ===== */
+
     .opt-map-area {
         display: flex;
         flex-direction: column;
@@ -339,7 +338,7 @@
         color: var(--text-dark);
     }
 
-    /* ===== Date Picker Button ===== */
+
     .date-picker-btn {
         display: inline-flex;
         align-items: center;
@@ -376,7 +375,7 @@
         pointer-events: none;
     }
 
-    /* ===== Map Container ===== */
+
     .opt-map-container {
         flex: 1;
         position: relative;
@@ -389,7 +388,7 @@
         border-radius: 0;
     }
 
-    /* ===== Floating Action Button ===== */
+
     .fab-optimize {
         position: absolute;
         bottom: 24px;
@@ -423,7 +422,7 @@
         font-size: 18px;
     }
 
-    /* ===== Stats Bar ===== */
+
     .stats-bar {
         display: flex;
         gap: 24px;
@@ -468,7 +467,7 @@
         color: var(--text-gray);
     }
 
-    /* ===== Empty State ===== */
+
     .empty-state {
         display: flex;
         flex-direction: column;
@@ -506,7 +505,7 @@
         color: var(--text-gray);
     }
 
-    /* ===== Timeline Section ===== */
+
     .timeline-section {
         padding: 0 24px 16px;
         border-top: 1px solid var(--border-color);
@@ -541,7 +540,7 @@
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
     }
 
-    /* ===== Loading State ===== */
+
     .loading-spinner {
         display: flex;
         align-items: center;
@@ -565,7 +564,7 @@
         }
     }
 
-    /* ===== Courier Marker ===== */
+
     .courier-marker {
         position: relative;
     }
@@ -609,7 +608,7 @@
         }
     }
 
-    /* ===== Unassigned Orders Section ===== */
+
     .unassigned-orders-section {
         border-top: 1px solid var(--border-color);
         background: rgba(248, 250, 252, 0.5);
@@ -750,7 +749,7 @@
         margin-bottom: 8px;
     }
 
-    /* ===== Route Edit Modal ===== */
+
     .route-edit-modal {
         position: fixed;
         top: 0;
@@ -871,7 +870,7 @@
         max-height: 400px;
     }
 
-    /* Draggable Order Item */
+
     .drag-order-item {
         display: flex;
         align-items: center;
@@ -1003,7 +1002,7 @@
 
 {% block content %}
 <div class="opt-container">
-    <!-- Left Sidebar -->
+
     <div class="opt-sidebar">
         <div class="opt-sidebar-header">
             <div class="opt-sidebar-title">
@@ -1014,7 +1013,7 @@
                 </span>
             </div>
 
-            <!-- Segmented Tabs -->
+
             <div class="route-tabs">
                 <button class="route-tab active" data-filter="all">Все</button>
                 <button class="route-tab" data-filter="active">Активные</button>
@@ -1022,12 +1021,12 @@
             </div>
         </div>
 
-        <!-- Routes List -->
+
         <div class="opt-routes-list" id="routes-list">
             <div class="loading-spinner"></div>
         </div>
 
-        <!-- Unassigned Orders Section -->
+
         <div class="unassigned-orders-section" id="unassigned-section">
             <div class="unassigned-header" id="unassigned-header">
                 <div class="unassigned-title">
@@ -1038,17 +1037,17 @@
                 <i class="fi fi-rr-angle-down unassigned-toggle" id="unassigned-toggle"></i>
             </div>
             <div class="unassigned-list" id="unassigned-list">
-                <!-- Orders loaded via JS -->
+
             </div>
         </div>
     </div>
 
-    <!-- Right Column - Map Area -->
+
     <div class="opt-map-area">
         <div class="opt-map-header">
             <span class="opt-map-title">Планирование на карте</span>
 
-            <!-- Styled Date Picker -->
+
             <label class="date-picker-btn" for="day">
                 <i class="fi fi-rr-calendar"></i>
                 <span class="date-picker-text" id="date-text">Сегодня, 4 Дек</span>
@@ -1056,18 +1055,18 @@
             </label>
         </div>
 
-        <!-- Map Container -->
+
         <div class="opt-map-container">
             <div id="map"></div>
 
-            <!-- Floating Action Button -->
+
             <button class="fab-optimize" id="btn-optimize">
                 <i class="fi fi-rr-route"></i>
                 Построить маршруты
             </button>
         </div>
 
-        <!-- Stats Bar -->
+
         <div class="stats-bar" id="stats-bar">
             <div class="stat-item">
                 <span class="stat-value" id="stat-routes">0</span>
@@ -1089,7 +1088,7 @@
     </div>
 </div>
 
-<!-- Route Edit Modal -->
+
 <div class="route-edit-modal" id="route-edit-modal">
     <div class="route-edit-overlay" id="route-edit-overlay"></div>
     <div class="route-edit-panel">
@@ -1100,14 +1099,14 @@
             </button>
         </div>
         <div class="route-edit-info" id="route-edit-info">
-            <!-- Route info loaded via JS -->
+
         </div>
         <div class="route-edit-hint">
             <i class="fi fi-rr-cursor-move"></i>
             Перетащите заказы для изменения порядка
         </div>
         <div class="route-edit-list" id="route-edit-list">
-            <!-- Draggable order items -->
+
         </div>
         <div class="route-edit-actions">
             <button class="btn btn-secondary" id="route-edit-cancel">Отмена</button>
@@ -1121,12 +1120,12 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Leaflet.js Library -->
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function () {
-        // ===== DOM Elements =====
+
         const dayInput = document.getElementById('day');
         const dateText = document.getElementById('date-text');
         const routesList = document.getElementById('routes-list');
@@ -1134,22 +1133,22 @@
         const routeCountValue = document.getElementById('route-count-value');
         const btnOptimize = document.getElementById('btn-optimize');
 
-        // Stats elements
+
         const statRoutes = document.getElementById('stat-routes');
         const statOrders = document.getElementById('stat-orders');
         const statDistance = document.getElementById('stat-distance');
         const statDuration = document.getElementById('stat-duration');
 
-        // ===== State Management =====
+
         const state = {
             routes: [],
             filteredRoutes: [],
-            activeFilter: 'all', // 'all', 'active', 'completed'
+            activeFilter: 'all',
             selectedRouteId: null,
             isLoading: false
         };
 
-        // ===== Vehicle Types (должны совпадать с моделью Courier) =====
+
         const vehicleTypes = [
             { type: 'car', label: 'Автомобиль', icon: 'fi-rr-car' },
             { type: 'truck', label: 'Грузовик', icon: 'fi-rr-truck-side' },
@@ -1158,7 +1157,7 @@
             { type: 'walk', label: 'Пешком', icon: 'fi-rr-walking' }
         ];
 
-        // ===== Initialize Leaflet Map =====
+
         const map = L.map('map').setView([55.7558, 37.6173], 11);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1169,43 +1168,43 @@
         let routeLayer = null;
         let markersLayer = L.layerGroup().addTo(map);
 
-        // Для отображения всех маршрутов одновременно
+
         let allRouteLayers = [];
         let allRouteMarkersLayer = L.layerGroup().addTo(map);
 
-        // Палитра цветов для маршрутов
+
         const routeColors = [
-            '#2196F3', // Синий
-            '#4CAF50', // Зелёный
-            '#FF9800', // Оранжевый
-            '#9C27B0', // Фиолетовый
-            '#00BCD4', // Голубой
-            '#E91E63', // Розовый
-            '#FF5722', // Красно-оранжевый
-            '#3F51B5', // Индиго
-            '#009688', // Бирюзовый
-            '#795548', // Коричневый
-            '#607D8B', // Серо-синий
-            '#FFC107'  // Жёлтый
+            '#2196F3',
+            '#4CAF50',
+            '#FF9800',
+            '#9C27B0',
+            '#00BCD4',
+            '#E91E63',
+            '#FF5722',
+            '#3F51B5',
+            '#009688',
+            '#795548',
+            '#607D8B',
+            '#FFC107'
         ];
 
-        // Цвета маркеров соответствующие маршрутам
+
         const markerColors = [
-            '#1976D2', // Синий (темнее)
-            '#388E3C', // Зелёный (темнее)
-            '#F57C00', // Оранжевый (темнее)
-            '#7B1FA2', // Фиолетовый (темнее)
-            '#0097A7', // Голубой (темнее)
-            '#C2185B', // Розовый (темнее)
-            '#E64A19', // Красно-оранжевый (темнее)
-            '#303F9F', // Индиго (темнее)
-            '#00796B', // Бирюзовый (темнее)
-            '#5D4037', // Коричневый (темнее)
-            '#455A64', // Серо-синий (темнее)
-            '#FFA000'  // Жёлтый (темнее)
+            '#1976D2',
+            '#388E3C',
+            '#F57C00',
+            '#7B1FA2',
+            '#0097A7',
+            '#C2185B',
+            '#E64A19',
+            '#303F9F',
+            '#00796B',
+            '#5D4037',
+            '#455A64',
+            '#FFA000'
         ];
 
-        // ===== Polyline Decoder =====
+
         function decodePolyline(encoded) {
             const coords = [];
             let index = 0, lat = 0, lng = 0;
@@ -1233,7 +1232,7 @@
             return coords;
         }
 
-        // ===== Date Formatting =====
+
         function formatDate(date) {
             const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
             const today = new Date();
@@ -1245,12 +1244,12 @@
             return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
         }
 
-        // ===== Initialize Date =====
+
         const today = new Date();
         dayInput.value = today.toISOString().split('T')[0];
         dateText.textContent = formatDate(dayInput.value);
 
-        // Click on label opens native date picker
+
         const datePickerBtn = document.querySelector('.date-picker-btn');
         datePickerBtn.addEventListener('click', () => {
             dayInput.showPicker();
@@ -1261,7 +1260,7 @@
             loadRoutes();
         });
 
-        // ===== Tab Click Handlers =====
+
         routeTabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 routeTabs.forEach(t => t.classList.remove('active'));
@@ -1271,13 +1270,13 @@
             });
         });
 
-        // ===== Load Routes =====
+
         async function loadRoutes() {
             state.isLoading = true;
             routesList.innerHTML = '<div class="loading-spinner"></div>';
 
             try {
-                // Load both active and completed routes from API
+
                 const [activeRes, completedRes] = await Promise.all([
                     api.get(`/api/routes?status=active&date=${dayInput.value}`),
                     api.get(`/api/routes?status=completed&date=${dayInput.value}`)
@@ -1288,21 +1287,21 @@
 
                 state.routes = [...activeRoutes, ...completedRoutes];
 
-                // Обработка данных маршрутов
+
                 state.routes = state.routes.map(route => ({
                     ...route,
                     orders_count: route.orders ? route.orders.length : 0,
-                    // Для красоты, пока в БД нет поля distance
+
                     distance_km: route.distance_km || (Math.random() * 20 + 5).toFixed(1),
                     duration_min: route.duration_min || 60,
-                    // Тип авто берем из API (vehicle_type курьера)
+
                     vehicle_type: route.vehicle_type || 'car'
                 }));
 
                 filterAndRenderRoutes();
                 updateStats();
 
-                // Отображаем все маршруты на карте
+
                 displayAllRoutesOnMap();
 
             } catch (error) {
@@ -1314,7 +1313,7 @@
             state.isLoading = false;
         }
 
-        // ===== Filter Routes =====
+
         function filterAndRenderRoutes() {
             if (state.activeFilter === 'all') {
                 state.filteredRoutes = state.routes;
@@ -1326,7 +1325,7 @@
             renderRoutesList();
         }
 
-        // ===== Render Routes List =====
+
         function renderRoutesList() {
             if (!state.filteredRoutes.length) {
                 routesList.innerHTML = `
@@ -1347,7 +1346,7 @@
                 const initials = getInitials(route.courier_name || 'Курьер');
                 const durationFormatted = formatDuration(route.duration_min);
 
-                // Цвет маршрута для визуальной связи с картой
+
                 const activeRoutes = state.routes.filter(r => r.status === 'active');
                 const activeIndex = activeRoutes.findIndex(r => r.id === route.id);
                 const colorIndex = activeIndex >= 0 ? activeIndex % routeColors.length : 0;
@@ -1409,10 +1408,10 @@
                 `;
             }).join('');
 
-            // Add event listeners
+
             routesList.querySelectorAll('.route-card').forEach(card => {
                 card.addEventListener('click', (e) => {
-                    // Ignore if clicking on buttons
+
                     if (e.target.closest('button')) return;
 
                     const routeId = card.dataset.routeId;
@@ -1445,7 +1444,7 @@
             });
         }
 
-        // ===== Helper Functions =====
+
         function getInitials(name) {
             return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
         }
@@ -1456,21 +1455,21 @@
             return h > 0 ? `${h}ч ${m}м` : `${m}м`;
         }
 
-        // ===== Display All Routes on Map =====
+
         async function displayAllRoutesOnMap() {
-            // Очищаем предыдущие маршруты
+
             allRouteLayers.forEach(layer => map.removeLayer(layer));
             allRouteLayers = [];
             allRouteMarkersLayer.clearLayers();
 
-            // Получаем только активные маршруты для отображения
+
             const routesToDisplay = state.routes.filter(r => r.status === 'active');
 
             if (routesToDisplay.length === 0) return;
 
             const allBounds = [];
 
-            // Загружаем и отображаем каждый маршрут
+
             for (let i = 0; i < routesToDisplay.length; i++) {
                 const route = routesToDisplay[i];
                 const colorIndex = i % routeColors.length;
@@ -1480,7 +1479,7 @@
                 try {
                     const routeData = await api.get(`/api/routes/${route.id}/optimize-view`);
 
-                    // Depot marker (Точка отправки)
+
                     const depot = routeData.depot || routeData.courier;
                     if (depot && depot.lat && depot.lon) {
                         const depotIcon = L.divIcon({
@@ -1510,7 +1509,7 @@
                         allBounds.push([depot.lat, depot.lon]);
                     }
 
-                    // Order markers
+
                     if (routeData.orders) {
                         routeData.orders.forEach((order, orderIndex) => {
                             const orderIcon = L.divIcon({
@@ -1541,7 +1540,7 @@
                         });
                     }
 
-                    // Route polyline
+
                     if (routeData.geometry || routeData.path) {
                         let pathCoords = [];
 
@@ -1569,32 +1568,32 @@
                 }
             }
 
-            // Fit map to show all routes
+
             if (allBounds.length > 0) {
                 map.fitBounds(allBounds, { padding: [50, 50] });
             }
         }
 
-        // ===== Select Route =====
+
         function selectRoute(routeId) {
             state.selectedRouteId = parseInt(routeId);
 
-            // Update visual selection
+
             routesList.querySelectorAll('.route-card').forEach(card => {
                 card.classList.toggle('selected', card.dataset.routeId === routeId);
             });
 
-            // Calculate color
+
             const activeRoutes = state.routes.filter(r => r.status === 'active');
             const activeIndex = activeRoutes.findIndex(r => r.id === parseInt(routeId));
             const colorIndex = activeIndex >= 0 ? activeIndex % routeColors.length : 0;
             const routeColor = routeColors[colorIndex];
 
-            // Load and display route on map
+
             viewRouteOnMap(routeId, routeColor);
         }
 
-        // ===== View Route on Map (without opening modal) =====
+
         async function viewRouteOnMap(routeId, color = '#2196F3') {
             try {
                 const response = await api.get(`/api/routes/${routeId}/optimize-view`);
@@ -1604,7 +1603,7 @@
             }
         }
 
-        // ===== Route Edit Modal Elements =====
+
         const routeEditModal = document.getElementById('route-edit-modal');
         const routeEditOverlay = document.getElementById('route-edit-overlay');
         const routeEditClose = document.getElementById('route-edit-close');
@@ -1617,7 +1616,7 @@
         let currentEditOrders = [];
         let draggedItem = null;
 
-        // Close modal handlers
+
         routeEditOverlay.addEventListener('click', closeRouteEditModal);
         routeEditClose.addEventListener('click', closeRouteEditModal);
         routeEditCancel.addEventListener('click', closeRouteEditModal);
@@ -1628,7 +1627,7 @@
             currentEditOrders = [];
         }
 
-        // ===== Open Route Edit Modal =====
+
         async function openRouteEdit(routeId) {
             currentEditRouteId = routeId;
 
@@ -1636,23 +1635,23 @@
                 const response = await api.get(`/api/routes/${routeId}/optimize-view`);
                 const route = state.routes.find(r => r.id === parseInt(routeId));
 
-                // Show route info
+
                 routeEditInfo.innerHTML = `
                     <div class="route-edit-info-title">${route?.name || 'Маршрут #' + routeId}</div>
                     <div class="route-edit-info-subtitle">${route?.courier_name || 'Курьер'} • ${response.orders?.length || 0} заказов</div>
                 `;
 
-                // Store orders for reordering
+
                 currentEditOrders = response.orders || [];
 
-                // Render draggable list
+
                 renderDragList();
 
-                // Show modal
+
                 routeEditModal.classList.add('active');
 
-                // Also show on map
-                // Calculate color
+
+
                 const activeRoutes = state.routes.filter(r => r.status === 'active');
                 const activeIndex = activeRoutes.findIndex(r => r.id === parseInt(routeId));
                 const colorIndex = activeIndex >= 0 ? activeIndex % routeColors.length : 0;
@@ -1666,7 +1665,7 @@
             }
         }
 
-        // Render draggable order list
+
         function renderDragList() {
             routeEditList.innerHTML = currentEditOrders.map((order, index) => `
                 <div class="drag-order-item" 
@@ -1687,10 +1686,10 @@
                 </div>
             `).join('');
 
-            // Add drag event listeners
+
             initDragAndDrop();
 
-            // Add unassign button listeners
+
             routeEditList.querySelectorAll('.btn-unassign-order').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
@@ -1700,11 +1699,11 @@
                     try {
                         const response = await fetch(`/api/orders/${orderId}/unassign`, { method: 'PUT' });
                         if (response.ok) {
-                            // Удаляем заказ из текущего списка
+
                             currentEditOrders = currentEditOrders.filter(o => o.order_id != orderId);
                             renderDragList();
                             showNotification('Заказ исключён из маршрута', 'success');
-                            // Обновляем список нераспределённых
+
                             loadUnassignedOrders();
                         } else {
                             showNotification('Ошибка при исключении заказа', 'error');
@@ -1717,7 +1716,7 @@
             });
         }
 
-        // Initialize drag and drop
+
         function initDragAndDrop() {
             const items = routeEditList.querySelectorAll('.drag-order-item');
 
@@ -1767,22 +1766,22 @@
             e.stopPropagation();
 
             if (draggedItem !== this) {
-                // Get indices
+
                 const fromIndex = parseInt(draggedItem.dataset.index);
                 const toIndex = parseInt(this.dataset.index);
 
-                // Reorder array
+
                 const [movedItem] = currentEditOrders.splice(fromIndex, 1);
                 currentEditOrders.splice(toIndex, 0, movedItem);
 
-                // Re-render list
+
                 renderDragList();
             }
 
             this.classList.remove('drag-over');
         }
 
-        // Save reordered route
+
         routeEditSave.addEventListener('click', async () => {
             if (!currentEditRouteId || !currentEditOrders.length) return;
 
@@ -1799,7 +1798,7 @@
                 if (response.success) {
                     showNotification('Порядок заказов сохранён!', 'success');
                     closeRouteEditModal();
-                    // Reload route on map
+
                     viewRouteOnMap(currentEditRouteId);
                     loadRoutes();
                 } else {
@@ -1814,7 +1813,7 @@
             }
         });
 
-        // ===== Send Route to Courier via Telegram =====
+
         async function sendRoute(routeId) {
             const route = state.routes.find(r => r.id === parseInt(routeId));
             const courierName = route?.courier_name || 'курьер';
@@ -1824,7 +1823,7 @@
             }
 
             try {
-                // Находим кнопку и меняем состояние
+
                 const btn = routesList.querySelector(`[data-action="send"][data-route-id="${routeId}"]`);
                 if (btn) {
                     btn.disabled = true;
@@ -1842,7 +1841,7 @@
                 console.error('Error sending route:', error);
                 showNotification('Ошибка отправки. Проверьте, привязан ли Telegram у курьера.', 'error');
             } finally {
-                // Восстанавливаем кнопку
+
                 const btn = routesList.querySelector(`[data-action="send"][data-route-id="${routeId}"]`);
                 if (btn) {
                     btn.disabled = false;
@@ -1851,7 +1850,7 @@
             }
         }
 
-        // ===== Delete Route =====
+
         async function deleteRoute(routeId) {
             if (!confirm('Удалить этот маршрут? Заказы будут откреплены и вернутся в список нераспределённых.')) {
                 return;
@@ -1861,7 +1860,7 @@
                 const response = await api.delete(`/api/routes/${routeId}`);
                 if (response.success) {
                     showNotification('Маршрут удалён', 'success');
-                    // Убираем маршрут с карты если он был выбран
+
                     if (state.selectedRouteId === parseInt(routeId)) {
                         if (routeLayer) {
                             map.removeLayer(routeLayer);
@@ -1870,7 +1869,7 @@
                         markersLayer.clearLayers();
                         state.selectedRouteId = null;
                     }
-                    // Перезагружаем список
+
                     loadRoutes();
                 } else {
                     showNotification(response.message || 'Ошибка удаления', 'error');
@@ -1881,14 +1880,14 @@
             }
         }
 
-        // ===== Display Route on Map =====
+
         function displayRouteOnMap(routeData) {
             if (routeLayer) {
                 map.removeLayer(routeLayer);
             }
             markersLayer.clearLayers();
 
-            // Depot marker (Точка отправки)
+
             const depot = routeData.depot || routeData.courier;
             if (depot && depot.lat && depot.lon) {
                 const depotIcon = L.divIcon({
@@ -1916,7 +1915,7 @@
                     .bindPopup(`<b>Депо:</b> ${depotLabel}`)
                     .addTo(markersLayer);
             } else if (routeData.courier && routeData.courier.start_lat && routeData.courier.start_lon) {
-                // Fallback на старые данные курьера
+
                 const depotIcon = L.divIcon({
                     className: 'custom-depot-marker',
                     html: `<div style="
@@ -1942,7 +1941,7 @@
                     .addTo(markersLayer);
             }
 
-            // Order markers
+
             if (routeData.orders) {
                 routeData.orders.forEach((order, index) => {
                     const orderIcon = L.divIcon({
@@ -1971,7 +1970,7 @@
                 });
             }
 
-            // Route polyline
+
             if (routeData.geometry || routeData.path) {
                 let pathCoords = [];
 
@@ -1997,7 +1996,7 @@
             }
         }
 
-        // ===== Update Stats =====
+
         function updateStats() {
             const routes = state.routes;
             statRoutes.textContent = routes.length;
@@ -2012,22 +2011,22 @@
             statDuration.textContent = formatDuration(totalDuration);
         }
 
-        // ===== FAB Click Handler (Кнопка "Построить маршруты") =====
+
         btnOptimize.addEventListener('click', async () => {
-            // Анимация кнопки
+
             const originalContent = btnOptimize.innerHTML;
             btnOptimize.innerHTML = '<i class="fi fi-rr-spinner fi-spin"></i> Думаем...';
             btnOptimize.disabled = true;
 
             try {
-                // Вызов API
+
                 const response = await api.post('/api/routes/optimize', {
                     date: dayInput.value
                 });
 
                 if (response.success) {
                     showNotification(response.message || 'Маршруты построены!', 'success');
-                    // Перезагружаем список маршрутов и нераспределённых заказов
+
                     loadRoutes();
                     loadUnassignedOrders();
                 } else {
@@ -2037,26 +2036,26 @@
                 console.error(error);
                 showNotification('Ошибка соединения с сервером', 'error');
             } finally {
-                // Возвращаем кнопку в исходное состояние
+
                 btnOptimize.innerHTML = originalContent;
                 btnOptimize.disabled = false;
             }
         });
 
-        // ===== Sample Routes Data (убраны заглушки - данные теперь приходят с бэкенда) =====
 
-        // ===== Unassigned Orders Section =====
+
+
         const unassignedSection = document.getElementById('unassigned-section');
         const unassignedHeader = document.getElementById('unassigned-header');
         const unassignedList = document.getElementById('unassigned-list');
         const unassignedCount = document.getElementById('unassigned-count');
 
-        // Toggle collapsed state
+
         unassignedHeader.addEventListener('click', () => {
             unassignedSection.classList.toggle('collapsed');
         });
 
-        // Load unassigned orders
+
         async function loadUnassignedOrders() {
             try {
                 const response = await api.get(`/api/orders?date=${dayInput.value}&status=planned`);
@@ -2093,11 +2092,11 @@
             }
         }
 
-        // ===== Courier Location Tracking =====
+
         let courierMarkersLayer = L.layerGroup().addTo(map);
         let courierLocationInterval = null;
 
-        // Vehicle icons mapping
+
         const vehicleIcons = {
             'car': '🚗',
             'truck': '🚚',
@@ -2147,38 +2146,38 @@
             });
         }
 
-        // Start auto-refresh for courier locations (every 30 seconds)
+
         function startCourierTracking() {
-            loadCourierLocations(); // Initial load
+
             courierLocationInterval = setInterval(loadCourierLocations, 30000);
         }
 
-        // Stop auto-refresh when leaving page
+
         window.addEventListener('beforeunload', () => {
             if (courierLocationInterval) {
                 clearInterval(courierLocationInterval);
             }
         });
 
-        // ===== SILENT POLLING для маршрутов =====
-        let lastRoutesJson = null; // Для сравнения данных
-        let isMapInteracting = false; // Флаг взаимодействия с картой
 
-        // Отслеживаем взаимодействие с картой
+
+
+
+
         map.on('movestart', () => { isMapInteracting = true; });
         map.on('moveend', () => { isMapInteracting = false; });
         map.on('zoomstart', () => { isMapInteracting = true; });
         map.on('zoomend', () => { isMapInteracting = false; });
 
         async function autoUpdateRoutes() {
-            // Пропускаем обновление если пользователь взаимодействует с картой
+
             if (isMapInteracting) {
                 console.log('⏸️ Пропуск обновления: пользователь взаимодействует с картой');
                 return;
             }
 
             try {
-                // Загружаем данные
+
                 const [activeRes, completedRes] = await Promise.all([
                     api.get(`/api/routes?status=active&date=${dayInput.value}`),
                     api.get(`/api/routes?status=completed&date=${dayInput.value}`)
@@ -2189,7 +2188,7 @@
 
                 const newRoutes = [...activeRoutes, ...completedRoutes];
 
-                // Создаём JSON для сравнения (без random данных)
+
                 const newRoutesJson = JSON.stringify(newRoutes.map(r => ({
                     id: r.id,
                     name: r.name,
@@ -2198,23 +2197,23 @@
                     orders_count: r.orders ? r.orders.length : 0
                 })));
 
-                // Сравниваем с предыдущими данными
+
                 if (lastRoutesJson === newRoutesJson) {
-                    // Данные не изменились - ничего не делаем
+
                     return;
                 }
 
-                // Данные изменились - обновляем
+
                 console.log('🔄 Обновление списка маршрутов (Silent Polling)');
                 lastRoutesJson = newRoutesJson;
 
-                // Запоминаем выбранный маршрут
+
                 const selectedRouteId = state.selectedRouteId;
 
-                // Запоминаем скролл
+
                 const scrollTop = routesList.scrollTop;
 
-                // Обновляем состояние
+
                 state.routes = newRoutes.map(route => ({
                     ...route,
                     orders_count: route.orders ? route.orders.length : 0,
@@ -2223,11 +2222,11 @@
                     vehicle_type: route.vehicle_type || 'car'
                 }));
 
-                // Перерисовываем только список (не карту!)
+
                 filterAndRenderRoutes();
                 updateStats();
 
-                // Восстанавливаем выбранный маршрут
+
                 if (selectedRouteId) {
                     state.selectedRouteId = selectedRouteId;
                     const selectedCard = routesList.querySelector(`[data-route-id="${selectedRouteId}"]`);
@@ -2236,7 +2235,7 @@
                     }
                 }
 
-                // Восстанавливаем скролл
+
                 routesList.scrollTop = scrollTop;
 
             } catch (error) {
@@ -2244,15 +2243,15 @@
             }
         }
 
-        // ===== Initial Load =====
+
         await loadRoutes();
         await loadUnassignedOrders();
-        startCourierTracking(); // Start tracking courier locations
 
-        // Тихое автообновление маршрутов каждые 5 секунд
+
+
         setInterval(autoUpdateRoutes, 5000);
 
-        // Reload unassigned orders when date changes
+
         dayInput.addEventListener('change', loadUnassignedOrders);
     });
 </script>
