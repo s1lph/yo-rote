@@ -121,11 +121,14 @@ def solve_vrp(orders, couriers, depot=None, route_date=None):
         
         vehicle_skills = [courier.id]
 
+        # Use courier's start location
+        start_coords = [courier.start_lon, courier.start_lat] if courier.start_lon and courier.start_lat else depot_coords
+        
         vehicles.append(optimization.Vehicle(
             id=courier.id,
             profile=profile,
-            start=depot_coords,  
-            end=depot_coords,    
+            start=start_coords,  
+            end=start_coords,    
             capacity=[courier.capacity or 50],  
             skills=vehicle_skills
         ))

@@ -1937,6 +1937,13 @@ def api_courier(courier_id):
                 'message': f'Нельзя удалить курьера с активными маршрутами ({active_routes})'
             }), 400
         
+        Order.query.filter_by(courier_id=courier_id).update({'courier_id': None})
+
+        routes = Route.query.filter_by(courier_id=courier_id).all()
+        for route in routes:
+            Order.query.filter_by(route_id=route.id).update({'route_id': None})
+            db.session.delete(route)
+        
         db.session.delete(courier)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Курьер удален'})
@@ -1971,27 +1978,6 @@ def api_courier_regenerate_code(courier_id):
 
 @app.route('/api/couriers/locations', methods=['GET'])
 def api_courier_locations():
-    """
-    GET /api/couriers/locations - Получение геолокаций активных курьеров
-    
-    Query параметры (опционально):
-    - route_id: фильтр по конкретному маршруту
-    
-    Возвращает:
-    {
-        "couriers": [
-            {
-                "id": number,
-                "full_name": "string",
-                "vehicle_type": "car|truck|bicycle|scooter",
-                "lat": number,
-                "lon": number,
-                "is_on_shift": boolean,
-                "current_order": "string|null"
-            }
-        ]
-    }
-    """
     user_id = get_current_user_id()
     route_id = request.args.get('route_id', None, type=int)
     
