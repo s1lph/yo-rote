@@ -4,9 +4,7 @@
 {% block title %}Планирование маршрута - yo.route{% endblock %}
 
 {% block extra_css %}
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<!-- 2GIS MapGL JS API не требует отдельного CSS файла -->
 <style>
     .opt-container {
         display: grid;
@@ -1120,9 +1118,8 @@
 {% endblock %}
 
 {% block extra_js %}
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- 2GIS MapGL JS API -->
+<script src="https://mapgl.2gis.com/api/js/v1"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function () {
 
@@ -1157,20 +1154,51 @@
             { type: 'walk', label: 'Пешком', icon: 'fi-rr-walking' }
         ];
 
+        // 2GIS MapGL API - инициализация карты с пробками
+        const TWOGIS_API_KEY = '{{ twogis_api_key }}';
+        let map = null;
+        let mapglAPI = null;
+        let routePolyline = null;
+        let markers = [];
+        let courierMarkers = [];
+        let lastRoutesJson = ''; // Для сравнения при автообновлении
 
-        const map = L.map('map').setView([55.7558, 37.6173], 11);
+        // Инициализация карты 2GIS MapGL
+        const initMap = async () => {
+            try {
+                // Ожидание загрузки MapGL SDK
+                await new Promise((resolve, reject) => {
+                    const checkMapgl = () => {
+                        if (window.mapgl) {
+                            resolve();
+                        } else {
+                            setTimeout(checkMapgl, 100);
+                        }
+                    };
+                    checkMapgl();
+                    setTimeout(() => reject(new Error('MapGL timeout')), 5000);
+                });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 19
-        }).addTo(map);
+                // Сохраняем ссылку на API
+                mapglAPI = window.mapgl;
 
-        let routeLayer = null;
-        let markersLayer = L.layerGroup().addTo(map);
+                // Создаём карту
+                map = new mapglAPI.Map('map', {
+                    center: [37.6173, 55.7558], // [lon, lat]
+                    zoom: 11,
+                    key: TWOGIS_API_KEY,
+                    trafficOn: true // Включить отображение пробок
+                });
 
+                console.log('✅ 2GIS MapGL карта инициализирована');
+            } catch (error) {
+                console.error('❌ Ошибка инициализации 2GIS MapGL:', error);
+                document.getElementById('map').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;">Ошибка загрузки карты. Проверьте API ключ 2GIS.</div>';
+            }
+        };
 
-        let allRouteLayers = [];
-        let allRouteMarkersLayer = L.layerGroup().addTo(map);
+        // Вызов инициализации
+        await initMap();
 
 
         const routeColors = [
@@ -1456,110 +1484,81 @@
         }
 
 
+        // Хранилище для полилиний всех маршрутов (2GIS)
+        let allPolylines = [];
+        let allMarkers2gis = [];
+
         async function displayAllRoutesOnMap() {
+            if (!map || !mapglAPI) {
+                console.warn('Map or mapglAPI not ready for displayAllRoutesOnMap');
+                return;
+            }
 
-            allRouteLayers.forEach(layer => map.removeLayer(layer));
-            allRouteLayers = [];
-            allRouteMarkersLayer.clearLayers();
-
+            // Очистка предыдущих маркеров и полилиний
+            allPolylines.forEach(p => { if (p && p.destroy) p.destroy(); });
+            allPolylines = [];
+            allMarkers2gis.forEach(m => { if (m && m.destroy) m.destroy(); });
+            allMarkers2gis = [];
 
             const routesToDisplay = state.routes.filter(r => r.status === 'active');
 
             if (routesToDisplay.length === 0) return;
 
-            const allBounds = [];
-
+            const allCoords = [];
 
             for (let i = 0; i < routesToDisplay.length; i++) {
                 const route = routesToDisplay[i];
                 const colorIndex = i % routeColors.length;
                 const routeColor = routeColors[colorIndex];
-                const markerColor = markerColors[colorIndex];
 
                 try {
                     const routeData = await api.get(`/api/routes/${route.id}/optimize-view`);
 
-
+                    // Маркер депо
                     const depot = routeData.depot || routeData.courier;
                     if (depot && depot.lat && depot.lon) {
-                        const depotIcon = L.divIcon({
-                            className: 'custom-depot-marker',
-                            html: `<div style="
-                                background: ${markerColor};
-                                color: white;
-                                width: 32px;
-                                height: 32px;
-                                border-radius: 50%;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                font-weight: bold;
-                                font-size: 14px;
-                                border: 3px solid white;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                            ">🏠</div>`,
-                            iconSize: [32, 32],
-                            iconAnchor: [16, 16]
-                        });
-
-                        L.marker([depot.lat, depot.lon], { icon: depotIcon })
-                            .bindPopup(`<b>Депо маршрута ${i + 1}:</b> ${depot.address || route.courier_name || 'Депо'}`)
-                            .addTo(allRouteMarkersLayer);
-
-                        allBounds.push([depot.lat, depot.lon]);
+                        const depotMarker = createMarker(
+                            [depot.lon, depot.lat],
+                            `🏠 Маршрут ${i + 1}`
+                        );
+                        if (depotMarker) allMarkers2gis.push(depotMarker);
+                        allCoords.push([depot.lon, depot.lat]);
                     }
 
-
+                    // Маркеры заказов
                     if (routeData.orders) {
                         routeData.orders.forEach((order, orderIndex) => {
-                            const orderIcon = L.divIcon({
-                                className: 'custom-order-marker',
-                                html: `<div style="
-                                    background: ${markerColor};
-                                    color: white;
-                                    width: 28px;
-                                    height: 28px;
-                                    border-radius: 50%;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    font-weight: bold;
-                                    font-size: 12px;
-                                    border: 2px solid white;
-                                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                                ">${orderIndex + 1}</div>`,
-                                iconSize: [28, 28],
-                                iconAnchor: [14, 14]
-                            });
-
-                            L.marker([order.lat, order.lng], { icon: orderIcon })
-                                .bindPopup(`<b style="color: ${markerColor}">Маршрут ${i + 1}</b><br><b>${orderIndex + 1}. ${order.order_name}</b><br>${order.address}`)
-                                .addTo(allRouteMarkersLayer);
-
-                            allBounds.push([order.lat, order.lng]);
+                            const orderMarker = createMarker(
+                                [order.lng, order.lat],
+                                `${orderIndex + 1}. ${order.order_name || 'Заказ'}`
+                            );
+                            if (orderMarker) allMarkers2gis.push(orderMarker);
+                            allCoords.push([order.lng, order.lat]);
                         });
                     }
 
-
+                    // Полилиния маршрута
                     if (routeData.geometry || routeData.path) {
                         let pathCoords = [];
 
                         if (routeData.geometry) {
-                            pathCoords = decodePolyline(routeData.geometry);
+                            const decoded = decodePolyline(routeData.geometry);
+                            pathCoords = decoded.map(c => [c[1], c[0]]); // [lon, lat]
                         } else if (routeData.path) {
-                            pathCoords = routeData.path.map(p => [p.lat, p.lng]);
+                            pathCoords = routeData.path.map(p => [p.lng, p.lat]);
                         }
 
                         if (pathCoords.length > 0) {
-                            const polyline = L.polyline(pathCoords, {
-                                color: routeColor,
-                                weight: 5,
-                                opacity: 0.8,
-                                smoothFactor: 1
-                            }).addTo(map);
-
-                            polyline.bindPopup(`<b style="color: ${routeColor}">Маршрут ${i + 1}</b><br>${route.courier_name || 'Курьер'}`);
-                            allRouteLayers.push(polyline);
+                            try {
+                                const polyline = new mapglAPI.Polyline(map, {
+                                    coordinates: pathCoords,
+                                    width: 5,
+                                    color: routeColor
+                                });
+                                allPolylines.push(polyline);
+                            } catch (error) {
+                                console.error('Error creating polyline for route', route.id, error);
+                            }
                         }
                     }
 
@@ -1568,9 +1567,11 @@
                 }
             }
 
-
-            if (allBounds.length > 0) {
-                map.fitBounds(allBounds, { padding: [50, 50] });
+            // Центрирование карты на всех точках
+            if (allCoords.length > 0) {
+                const centerCoord = allCoords[Math.floor(allCoords.length / 2)];
+                map.setCenter(centerCoord);
+                map.setZoom(11);
             }
         }
 
@@ -1862,11 +1863,9 @@
                     showNotification('Маршрут удалён', 'success');
 
                     if (state.selectedRouteId === parseInt(routeId)) {
-                        if (routeLayer) {
-                            map.removeLayer(routeLayer);
-                            routeLayer = null;
-                        }
-                        markersLayer.clearLayers();
+                        // Очистка маршрута и маркеров 2GIS
+                        clearPolyline();
+                        clearMarkers();
                         state.selectedRouteId = null;
                     }
 
@@ -1880,119 +1879,114 @@
             }
         }
 
+        // Функция очистки маркеров 2GIS
+        function clearMarkers() {
+            markers.forEach(m => { if (m && m.destroy) m.destroy(); });
+            markers = [];
+        }
+
+        // Функция очистки полилинии 2GIS
+        function clearPolyline() {
+            if (routePolyline && routePolyline.destroy) {
+                routePolyline.destroy();
+                routePolyline = null;
+            }
+        }
+
+        // Создание маркера для 2GIS используя стандартный Marker API
+        function createMarker(coords, label, color = '#2563eb') {
+            if (!map || !mapglAPI) {
+                console.warn('Map or mapglAPI not ready');
+                return null;
+            }
+
+            try {
+                const marker = new mapglAPI.Marker(map, {
+                    coordinates: coords, // [lon, lat]
+                    label: {
+                        text: label,
+                        offset: [0, -40],
+                        color: '#fff',
+                        fontSize: 12
+                    }
+                });
+                return marker;
+            } catch (error) {
+                console.error('Error creating marker:', error);
+                return null;
+            }
+        }
 
         function displayRouteOnMap(routeData) {
-            if (routeLayer) {
-                map.removeLayer(routeLayer);
+            if (!map || !mapglAPI) {
+                console.warn('Карта не инициализирована');
+                return;
             }
-            markersLayer.clearLayers();
 
+            // Очистка предыдущих объектов
+            clearMarkers();
+            clearPolyline();
 
+            // Маркер депо
             const depot = routeData.depot || routeData.courier;
             if (depot && depot.lat && depot.lon) {
-                const depotIcon = L.divIcon({
-                    className: 'custom-depot-marker',
-                    html: `<div style="
-                        background: #FF6B6B;
-                        color: white;
-                        width: 36px;
-                        height: 36px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 18px;
-                        border: 3px solid white;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    ">🏠</div>`,
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
-                });
-
-                const depotLabel = depot.address || (routeData.courier ? routeData.courier.full_name : 'Депо');
-                L.marker([depot.lat, depot.lon], { icon: depotIcon })
-                    .bindPopup(`<b>Депо:</b> ${depotLabel}`)
-                    .addTo(markersLayer);
+                const depotMarker = createMarker(
+                    [depot.lon, depot.lat], // [lon, lat] для 2GIS
+                    '🏠 Депо'
+                );
+                if (depotMarker) markers.push(depotMarker);
             } else if (routeData.courier && routeData.courier.start_lat && routeData.courier.start_lon) {
-
-                const depotIcon = L.divIcon({
-                    className: 'custom-depot-marker',
-                    html: `<div style="
-                        background: #FF6B6B;
-                        color: white;
-                        width: 36px;
-                        height: 36px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 18px;
-                        border: 3px solid white;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    ">🏠</div>`,
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
-                });
-
-                L.marker([routeData.courier.start_lat, routeData.courier.start_lon], { icon: depotIcon })
-                    .bindPopup(`<b>Депо: ${routeData.courier.full_name}</b>`)
-                    .addTo(markersLayer);
+                const depotMarker = createMarker(
+                    [routeData.courier.start_lon, routeData.courier.start_lat],
+                    '🏠 Депо'
+                );
+                if (depotMarker) markers.push(depotMarker);
             }
 
-
+            // Маркеры заказов
             if (routeData.orders) {
                 routeData.orders.forEach((order, index) => {
-                    const orderIcon = L.divIcon({
-                        className: 'custom-order-marker',
-                        html: `<div style="
-                            background: #4ECDC4;
-                            color: white;
-                            width: 32px;
-                            height: 32px;
-                            border-radius: 50%;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-weight: bold;
-                            font-size: 14px;
-                            border: 3px solid white;
-                            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                        ">${index + 1}</div>`,
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 16]
-                    });
-
-                    L.marker([order.lat, order.lng], { icon: orderIcon })
-                        .bindPopup(`<b>${index + 1}. ${order.order_name}</b><br>${order.address}`)
-                        .addTo(markersLayer);
+                    const orderMarker = createMarker(
+                        [order.lng, order.lat], // [lon, lat] для 2GIS
+                        `${index + 1}. ${order.order_name || 'Заказ'}`
+                    );
+                    if (orderMarker) markers.push(orderMarker);
                 });
             }
 
-
+            // Полилиния маршрута
             if (routeData.geometry || routeData.path) {
                 let pathCoords = [];
 
                 if (routeData.geometry) {
-                    pathCoords = decodePolyline(routeData.geometry);
+                    // Декодируем polyline и конвертируем [lat, lon] -> [lon, lat]
+                    const decoded = decodePolyline(routeData.geometry);
+                    pathCoords = decoded.map(c => [c[1], c[0]]); // [lon, lat]
                 } else if (routeData.path) {
-                    pathCoords = routeData.path.map(p => [p.lat, p.lng]);
+                    pathCoords = routeData.path.map(p => [p.lng, p.lat]); // [lon, lat]
                 }
 
                 if (pathCoords.length > 0) {
-                    routeLayer = L.polyline(pathCoords, {
-                        color: '#2196F3',
-                        weight: 4,
-                        opacity: 0.7,
-                        smoothFactor: 1
-                    }).addTo(map);
+                    try {
+                        routePolyline = new mapglAPI.Polyline(map, {
+                            coordinates: pathCoords,
+                            width: 5,
+                            color: '#2196F3'
+                        });
 
-                    map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                        // Центрирование карты на маршруте
+                        const centerIdx = Math.floor(pathCoords.length / 2);
+                        map.setCenter(pathCoords[centerIdx]);
+                        map.setZoom(12);
+                    } catch (error) {
+                        console.error('Error creating polyline:', error);
+                    }
                 }
             } else if (routeData.orders?.length > 0) {
-                const bounds = L.latLngBounds(routeData.orders.map(o => [o.lat, o.lng]));
-                map.fitBounds(bounds, { padding: [50, 50] });
+                // Центрирование на заказах
+                const firstOrder = routeData.orders[0];
+                map.setCenter([firstOrder.lng, firstOrder.lat]);
+                map.setZoom(12);
             }
         }
 
@@ -2092,10 +2086,8 @@
             }
         }
 
-
-        let courierMarkersLayer = L.layerGroup().addTo(map);
+        // Маркеры курьеров 2GIS
         let courierLocationInterval = null;
-
 
         const vehicleIcons = {
             'car': '🚗',
@@ -2104,6 +2096,12 @@
             'scooter': '🛵',
             'walk': '🚶'
         };
+
+        // Функция очистки маркеров курьеров 2GIS
+        function clearCourierMarkers() {
+            courierMarkers.forEach(m => { if (m && m.destroy) m.destroy(); });
+            courierMarkers = [];
+        }
 
         async function loadCourierLocations() {
             try {
@@ -2115,34 +2113,20 @@
         }
 
         function displayCourierMarkers(couriers) {
-            courierMarkersLayer.clearLayers();
+            if (!map || !mapglAPI) return;
+
+            clearCourierMarkers();
 
             couriers.forEach(courier => {
                 if (!courier.lat || !courier.lon) return;
 
                 const vehicleIcon = vehicleIcons[courier.vehicle_type] || '🚗';
-                const bgColor = '#2563eb'; // Primary blue
 
-                const courierIcon = L.divIcon({
-                    className: 'courier-marker',
-                    html: `
-                        <div class="courier-marker-pulse"></div>
-                        <div class="courier-marker-inner" style="background: ${bgColor};">
-                            ${vehicleIcon}
-                        </div>
-                    `,
-                    iconSize: [40, 40],
-                    iconAnchor: [20, 20]
-                });
-
-                const popupContent = `
-                    <b>🧑‍💼 ${courier.full_name}</b><br>
-                    ${courier.current_order ? `📦 ${courier.current_order}` : '⏳ Ожидает заказ'}
-                `;
-
-                L.marker([courier.lat, courier.lon], { icon: courierIcon })
-                    .bindPopup(popupContent)
-                    .addTo(courierMarkersLayer);
+                const marker = createMarker(
+                    [courier.lon, courier.lat], // [lon, lat] для 2GIS
+                    `${vehicleIcon} ${courier.full_name || 'Курьер'}`
+                );
+                if (marker) courierMarkers.push(marker);
             });
         }
 
@@ -2161,13 +2145,8 @@
 
 
 
-
-
-
-        map.on('movestart', () => { isMapInteracting = true; });
-        map.on('moveend', () => { isMapInteracting = false; });
-        map.on('zoomstart', () => { isMapInteracting = true; });
-        map.on('zoomend', () => { isMapInteracting = false; });
+        // Флаг взаимодействия с картой (для 2GIS используем упрощённую логику)
+        let isMapInteracting = false;
 
         async function autoUpdateRoutes() {
 

@@ -12,7 +12,19 @@ from sqlalchemy import or_
 import re
 load_dotenv()
 from models import db, User, Courier, Order, Route, Point
-import optimizer
+
+# Попытка использовать 2GIS оптимизатор, иначе fallback на ORS
+try:
+    from optimizer_2gis import solve_vrp_2gis, geocode_address_2gis
+    USE_2GIS = bool(os.getenv('TWOGIS_API_KEY'))
+    if USE_2GIS:
+        print("✅ Используется 2GIS для оптимизации маршрутов")
+except ImportError:
+    USE_2GIS = False
+    print("⚠️ optimizer_2gis не найден, используется ORS")
+
+import optimizer  # ORS fallback
+
 app = Flask(__name__)
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000').split(',')
 cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
@@ -136,7 +148,8 @@ def orders():
     return render_template('orders.html')
 @app.route('/optimization')
 def optimization():
-    return render_template('optimization.html')
+    twogis_api_key = os.getenv('TWOGIS_API_KEY', '')
+    return render_template('optimization.html', twogis_api_key=twogis_api_key)
 @app.route('/points')
 def points():
     return render_template('points.html')
@@ -932,7 +945,11 @@ def api_routes_optimize():
             errors.append(f'Нет свободных курьеров для точки {point_key} ({len(group_orders)} заказов)')
             continue
         try:
-            routes_data = optimizer.solve_vrp(group_orders, available_couriers, depot_coords)
+            # Использование 2GIS с fallback на ORS
+            if USE_2GIS:
+                routes_data = solve_vrp_2gis(group_orders, available_couriers, depot_coords, date)
+            else:
+                routes_data = optimizer.solve_vrp(group_orders, available_couriers, depot_coords, date)
         except Exception as e:
             print(f"Ошибка VRP для точки {point_key}: {e}")
             errors.append(f'Ошибка оптимизации для точки {point_key}')
