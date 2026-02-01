@@ -4,12 +4,14 @@
 {% block title %}Общие настройки - yo.route{% endblock %}
 
 {% block content %}
-<div class="form-container" style="max-width: 800px;">
-    <div class="page-header">
-        <h1 class="page-title">Общие настройки</h1>
+<div style="max-width: 600px;">
+    <div class="page-header" style="margin-bottom: 16px;">
+        <h1 class="page-title"><i class="fi fi-sr-settings" style="color: var(--primary-blue);"></i> Общие настройки
+        </h1>
     </div>
 
-    <form action="/api/settings" method="POST" data-method="PUT">
+    <form action="/api/settings" method="POST" data-method="PUT"
+        style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 24px;">
         <div class="list-section">
             <h2 class="section-title">Внешний вид</h2>
 
@@ -58,7 +60,7 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', async function() {
+    document.addEventListener('DOMContentLoaded', async function () {
         const themeSelect = document.getElementById('theme');
         const defaultPageSelect = document.getElementById('default_page');
         const planningModeSelect = document.getElementById('planning_mode');
@@ -68,7 +70,7 @@
             const savedTheme = localStorage.getItem('theme') || 'light';
             themeSelect.value = savedTheme;
             applyTheme(savedTheme);
-            themeSelect.addEventListener('change', function(e) {
+            themeSelect.addEventListener('change', function (e) {
                 applyTheme(e.target.value);
             });
         }

@@ -4,13 +4,16 @@
 {% block title %}Курьеры - yo.route{% endblock %}
 
 {% block content %}
-<div class="two-column" id="couriers-container" style="max-width: 100%;">
-    <div class="column" style="padding-bottom: 80px;">
-        <div class="page-header">
+<div id="couriers-container">
+    <div style="padding-bottom: 80px;">
+        <div class="page-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h1 class="page-title"><i class="fi fi-sr-users-alt" style="color: var(--primary-blue);"></i> Курьеры</h1>
+            <button class="btn btn-primary" id="add-courier-btn" style="width: auto;"><i class="fi fi-sr-user-add"></i>
+                Добавить курьера</button>
         </div>
 
-        <div class="table-container">
+        <div class="table-container" style="margin-bottom: 0; box-shadow: none; border: 1px solid var(--border-color);">
             <table class="table">
                 <thead>
                     <tr>
@@ -28,13 +31,10 @@
                 </tbody>
             </table>
         </div>
-
-        <button class="btn btn-primary" id="add-courier-btn" style="margin-top: 24px;"><i class="fi fi-sr-user-add"></i>
-            Добавить курьера</button>
     </div>
 
 
-    <div class="column" id="add-courier-column" style="display: none; opacity: 0;">
+    <div class="slide-panel" id="add-courier-column" style="display: none; opacity: 0;">
         <div class="page-header">
             <button class="back-button" id="close-add-courier-btn">←</button>
             <h2 class="page-title" style="font-size: 20px;">Добавление курьера</h2>

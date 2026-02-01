@@ -4,8 +4,8 @@
 {% block title %}Вход - yo.route{% endblock %}
 
 {% block content %}
-<div id="welcome-text" class="welcome-text-container" style="text-align: center; margin-bottom: 16px;">
-    <div id="text-type" class="text-type"></div>
+<div class="welcome-text-container" style="text-align: center; margin-bottom: 16px;">
+    Добро пожаловать в yo.route
 </div>
 
 <div class="form-container">
@@ -92,129 +92,13 @@
 
 {% block extra_js %}
 <script>
-
-    class TextType {
-        constructor(element, options = {}) {
-            this.element = element;
-            this.text = Array.isArray(options.text) ? options.text : [options.text || ''];
-            this.typingSpeed = options.typingSpeed || 50;
-            this.initialDelay = options.initialDelay || 0;
-            this.pauseDuration = options.pauseDuration || 2000;
-            this.deletingSpeed = options.deletingSpeed || 30;
-            this.loop = options.loop !== undefined ? options.loop : true;
-            this.showCursor = options.showCursor !== undefined ? options.showCursor : true;
-            this.hideCursorWhileTyping = options.hideCursorWhileTyping || false;
-            this.cursorCharacter = options.cursorCharacter || '|';
-            this.cursorBlinkDuration = options.cursorBlinkDuration || 0.5;
-            this.textColors = options.textColors || [];
-
-            this.displayedText = '';
-            this.currentCharIndex = 0;
-            this.isDeleting = false;
-            this.currentTextIndex = 0;
-            this.timeout = null;
-
-            this.init();
-        }
-
-        init() {
-            this.element.innerHTML = '<span class="text-type__content"></span>' +
-                (this.showCursor ? `<span class="text-type__cursor">${this.cursorCharacter}</span>` : '');
-
-            this.contentSpan = this.element.querySelector('.text-type__content');
-            this.cursorSpan = this.element.querySelector('.text-type__cursor');
-
-            if (this.cursorSpan) {
-                this.cursorSpan.style.animation = `text-type-blink ${this.cursorBlinkDuration}s infinite`;
-            }
-
-            if (this.initialDelay > 0) {
-                setTimeout(() => this.animate(), this.initialDelay);
-            } else {
-                this.animate();
-            }
-        }
-
-        animate() {
-            if (this.timeout) {
-                clearTimeout(this.timeout);
-            }
-
-            const currentText = this.text[this.currentTextIndex];
-
-            if (this.isDeleting) {
-                if (this.displayedText === '') {
-                    this.isDeleting = false;
-                    this.currentTextIndex = (this.currentTextIndex + 1) % this.text.length;
-                    this.currentCharIndex = 0;
-                    this.timeout = setTimeout(() => this.animate(), this.pauseDuration);
-                    return;
-                }
-
-                this.displayedText = this.displayedText.slice(0, -1);
-                this.updateDisplay();
-                this.timeout = setTimeout(() => this.animate(), this.deletingSpeed);
-            } else {
-                if (this.currentCharIndex < currentText.length) {
-                    this.displayedText += currentText[this.currentCharIndex];
-                    this.currentCharIndex++;
-                    this.updateDisplay();
-                    this.timeout = setTimeout(() => this.animate(), this.typingSpeed);
-                } else {
-                    if (!this.loop && this.currentTextIndex === this.text.length - 1) {
-                        return;
-                    }
-                    this.timeout = setTimeout(() => {
-                        this.isDeleting = true;
-                        this.animate();
-                    }, this.pauseDuration);
-                }
-            }
-        }
-
-        updateDisplay() {
-            if (this.contentSpan) {
-                const color = this.textColors.length > 0
-                    ? this.textColors[this.currentTextIndex % this.textColors.length]
-                    : '';
-                this.contentSpan.textContent = this.displayedText;
-                if (color) {
-                    this.contentSpan.style.color = color;
-                }
-            }
-
-            if (this.cursorSpan && this.hideCursorWhileTyping) {
-                const isTyping = this.currentCharIndex < this.text[this.currentTextIndex].length;
-                if (isTyping || this.isDeleting) {
-                    this.cursorSpan.classList.add('text-type__cursor--hidden');
-                } else {
-                    this.cursorSpan.classList.remove('text-type__cursor--hidden');
-                }
-            }
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', function () {
-
-        const textTypeElement = document.getElementById('text-type');
-        if (textTypeElement) {
-            new TextType(textTypeElement, {
-                text: ['Добро пожаловать в yo.route', 'Твой путь - yo.route', 'Developed by s1lph'],
-                typingSpeed: 75,
-                pauseDuration: 1500,
-                showCursor: true,
-                cursorCharacter: '|',
-                loop: true
-            });
-        }
-
         const loginForm = document.getElementById('login-form');
 
         loginForm.addEventListener('submit', async function (e) {
             e.preventDefault();
             const formData = new FormData(this);
             const data = Object.fromEntries(formData);
-
 
             data.remember = data.remember === 'on';
 
@@ -231,13 +115,11 @@
                 const result = await response.json();
 
                 if (result.success) {
-
                     if (result.token) {
                         api.setToken(result.token);
                     }
 
                     showNotification('Вход выполнен успешно', 'success');
-
 
                     const redirect = this.dataset.redirect || '/orders';
                     setTimeout(() => {

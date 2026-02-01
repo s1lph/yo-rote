@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
-
     .autocomplete-dropdown {
         position: absolute;
         top: 100%;
@@ -56,22 +55,25 @@
 {% endblock %}
 
 {% block content %}
-<div class="two-column" id="points-container" style="max-width: 100%;">
-    <div class="column" style="padding-bottom: 80px;">
-        <h1 class="page-title" style="margin-bottom: 8px;"><i class="fi fi-sr-map-marker"
-                style="color: var(--primary-blue);"></i> Точки отправки</h1>
+<div id="points-container">
+    <div style="padding-bottom: 80px;">
+        <div class="page-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h1 class="page-title"><i class="fi fi-sr-map-marker" style="color: var(--primary-blue);"></i> Точки
+                отправки</h1>
+            <button class="btn btn-primary" id="add-point-btn" style="width: auto;"><i class="fi fi-sr-marker"></i>
+                Добавить точку</button>
+        </div>
 
-        <div class="radio-group" id="points-list">
+        <div class="radio-group" id="points-list"
+            style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
             <div class="radio-item">
                 <label>Загрузка точек...</label>
             </div>
         </div>
-
-        <button class="btn btn-primary" id="add-point-btn" style="margin-top: 24px;"><i class="fi fi-sr-marker"></i>
-            Добавить точку</button>
     </div>
 
-    <div class="column" id="add-point-column" style="display: none; opacity: 0;">
+    <div class="slide-panel" id="add-point-column" style="display: none; opacity: 0;">
         <div class="page-header">
             <button class="back-button" id="close-add-point-btn">←</button>
             <h2 class="page-title" style="font-size: 20px;">Добавление точки</h2>

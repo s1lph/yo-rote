@@ -1,7 +1,6 @@
 
 
 document.addEventListener('DOMContentLoaded', function () {
-    
     initTabs();
     initPopups();
     initForms();
@@ -44,7 +43,6 @@ function initPopups() {
         });
     });
 
-    
     document.querySelectorAll('.popup').forEach(popup => {
         popup.addEventListener('click', function (e) {
             if (e.target === this) {
@@ -80,7 +78,6 @@ async function handleFormSubmit(form) {
     }
 
     try {
-        
         const result = await api.request(action, {
             method: method,
             body: JSON.stringify(data)
@@ -122,26 +119,20 @@ function showNotification(message, type = 'info') {
         background: ${colors[type] || colors.info};
         color: white;
         border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         z-index: 10000;
         font-weight: 500;
         font-size: 14px;
         max-width: 400px;
         word-wrap: break-word;
-        animation: slideInNotification 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        transform-origin: top right;
-        backdrop-filter: blur(10px);
     `;
 
     document.body.appendChild(notification);
 
     setTimeout(() => {
-        notification.style.animation = 'slideOutNotification 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                document.body.removeChild(notification);
-            }
-        }, 300);
+        if (notification.parentNode) {
+            document.body.removeChild(notification);
+        }
     }, 3000);
 }
 
@@ -154,22 +145,18 @@ function applyTheme(theme) {
 
 
 const api = {
-    
     getToken() {
         return localStorage.getItem('auth_token');
     },
 
-    
     setToken(token) {
         localStorage.setItem('auth_token', token);
     },
 
-    
     clearToken() {
         localStorage.removeItem('auth_token');
     },
 
-    
     async request(url, options = {}) {
         const token = this.getToken();
         const headers = {
@@ -177,7 +164,6 @@ const api = {
             ...options.headers
         };
 
-        
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
@@ -185,10 +171,8 @@ const api = {
         try {
             const response = await fetch(url, { ...options, headers });
 
-            
             if (response.status === 401) {
                 this.clearToken();
-                
                 if (!window.location.pathname.includes('/login') &&
                     !window.location.pathname.includes('/registration')) {
                     window.location.href = '/login';
@@ -225,31 +209,3 @@ const api = {
         return this.request(url, { method: 'DELETE' });
     }
 };
-
-
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInNotification {
-        from {
-            transform: translateX(120%) scale(0.8);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0) scale(1);
-            opacity: 1;
-        }
-    }
-    
-    @keyframes slideOutNotification {
-        from {
-            transform: translateX(0) scale(1);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(120%) scale(0.8);
-            opacity: 0;
-        }
-    }
-`;
-document.head.appendChild(style);
-

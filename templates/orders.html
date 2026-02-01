@@ -283,10 +283,10 @@
 
 {% block content %}
 
-<div class="two-column" id="orders-container" style="max-width: 100%;">
-    <div class="column" id="orders-list-page" style="padding-bottom: 80px;">
+<div id="orders-container">
+    <div id="orders-list-page" style="padding-bottom: 80px;">
         <div class="page-header"
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <h1 class="page-title"><i class="fi fi-sr-clipboard-list" style="color: var(--primary-blue);"></i>
                     Заказы</h1>
@@ -304,7 +304,7 @@
             </div>
         </div>
 
-        <div class="table-container">
+        <div class="table-container" style="margin-bottom: 0; box-shadow: none; border: 1px solid var(--border-color);">
             <table class="table">
                 <thead>
                     <tr>
@@ -330,8 +330,8 @@
         </div>
     </div>
 
-    <!-- Форма создания заказа (скрыта по умолчанию, открывается справа) -->
-    <div class="column" id="create-order-column" style="display: none; opacity: 0;">
+    <!-- Форма создания заказа (слайд-панель справа) -->
+    <div class="slide-panel" id="create-order-column" style="display: none; opacity: 0;">
         <div class="page-header">
             <button class="back-button" id="close-create-order-btn">←</button>
             <h2 class="page-title" style="font-size: 20px;">Создание заказа</h2>
