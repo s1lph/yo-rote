@@ -930,6 +930,12 @@
                 selectedCount.textContent = `Выбрано ${selected.length}: ${preview}${extra}`;
                 selectedOrdersPanel.classList.add('active');
 
+                // Скрываем кнопку "Изменить" при множественном выборе
+                if (selected.length > 1) {
+                    editOrderBtn.style.display = 'none';
+                } else {
+                    editOrderBtn.style.display = '';
+                }
             } else {
                 selectedOrdersPanel.classList.remove('active');
 
@@ -1315,7 +1321,7 @@
 
                 return `
                     <tr data-order-row>
-                        <td><input type="radio" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
+                        <td><input type="checkbox" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
                         <td>${typeIcon}</td>
                         <td><strong>${orderName}</strong></td>
                         <td>${pointAddress}</td>
@@ -1435,7 +1441,7 @@
                         row.setAttribute('data-order-row', '');
 
                         row.innerHTML = `
-                            <td><input type="radio" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
+                            <td><input type="checkbox" name="selected_order" value="${orderId}" data-order-name="${orderName}"></td>
                             <td>${cellData[1]}</td>
                             <td>${cellData[2]}</td>
                             <td>${cellData[3]}</td>

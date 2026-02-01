@@ -169,11 +169,21 @@
 
 
         function updateSelectedCourierPanel() {
-            const selected = document.querySelector('input[name="selected_courier"]:checked');
-            if (selected) {
-                const name = selected.closest('tr').cells[1].textContent;
-                selectedCourierText.textContent = `Выбран: ${name}`;
+            const selected = document.querySelectorAll('input[name="selected_courier"]:checked');
+            if (selected.length > 0) {
+                const firstName = selected[0].closest('tr').cells[1].textContent;
+                const extra = selected.length > 1 ? ` и ещё ${selected.length - 1}` : '';
+                selectedCourierText.textContent = `Выбрано ${selected.length}: ${firstName}${extra}`;
                 selectedCourierPanel.classList.add('active');
+
+                // Скрываем кнопки "Изменить" и "Новый код" при множественном выборе
+                if (selected.length > 1) {
+                    editCourierBtn.style.display = 'none';
+                    regenerateCodeBtn.style.display = 'none';
+                } else {
+                    editCourierBtn.style.display = '';
+                    regenerateCodeBtn.style.display = '';
+                }
             } else {
                 selectedCourierPanel.classList.remove('active');
             }
@@ -245,7 +255,7 @@
                         row = document.createElement('tr');
                         row.setAttribute('data-courier-id', id);
                         row.innerHTML = `
-                            <td><input type="radio" name="selected_courier" value="${courier.id}"></td>
+                            <td><input type="checkbox" name="selected_courier" value="${courier.id}"></td>
                             <td>${cellData[1]}</td>
                             <td>${cellData[2]}</td>
                             <td>${cellData[3]}</td>
@@ -300,7 +310,7 @@
 
                 return `
                     <tr data-courier-id="${courier.id}">
-                        <td><input type="radio" name="selected_courier" value="${courier.id}"></td>
+                        <td><input type="checkbox" name="selected_courier" value="${courier.id}"></td>
                         <td>${courier.full_name || ''}</td>
                         <td>${vehicleTypeMap[courier.vehicle_type] || courier.vehicle_type || ''}</td>
                         <td>${courier.phone || ''}</td>
@@ -339,11 +349,12 @@
 
 
         editCourierBtn.addEventListener('click', function () {
-            const selected = document.querySelector('input[name="selected_courier"]:checked');
-            if (!selected) return;
+            const selected = document.querySelectorAll('input[name="selected_courier"]:checked');
+            if (selected.length !== 1) return;
+            const selectedInput = selected[0];
 
-            const courierId = selected.value;
-            const row = selected.closest('tr');
+            const courierId = selectedInput.value;
+            const row = selectedInput.closest('tr');
             const courierName = row.cells[1].textContent;
             const vehicleType = row.cells[2].textContent;
             const phone = row.cells[3].textContent;

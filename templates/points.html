@@ -224,7 +224,7 @@
                         const div = document.createElement('div');
                         div.className = `radio-item ${point.is_primary ? 'primary-point' : ''}`;
                         div.innerHTML = `
-                            <input type="radio" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
+                            <input type="checkbox" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
                             <label for="point-${point.id}">
                                 ${labelContent}
                             </label>
@@ -288,7 +288,7 @@
 
             pointsList.innerHTML = points.map(point => `
                 <div class="radio-item ${point.is_primary ? 'primary-point' : ''}">
-                    <input type="radio" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
+                    <input type="checkbox" id="point-${point.id}" name="selected_point" value="${point.id}" data-address="${point.address}" data-primary="${point.is_primary}">
                     <label for="point-${point.id}">
                         ${point.address}
                         ${point.is_primary ? '<span class="primary-badge">Главная точка</span>' : ''}
@@ -301,11 +301,19 @@
         }
 
         function updateSelectedPointPanel() {
-            const selected = document.querySelector('input[name="selected_point"]:checked');
-            if (selected) {
-                const address = selected.closest('.radio-item').querySelector('label').textContent.trim();
-                selectedPointText.textContent = `Выбрана: ${address}`;
+            const selected = document.querySelectorAll('input[name="selected_point"]:checked');
+            if (selected.length > 0) {
+                const firstAddress = selected[0].closest('.radio-item').querySelector('label').textContent.trim();
+                const extra = selected.length > 1 ? ` и ещё ${selected.length - 1}` : '';
+                selectedPointText.textContent = `Выбрано ${selected.length}: ${firstAddress}${extra}`;
                 selectedPointPanel.classList.add('active');
+
+                // Скрываем кнопку "Изменить" при множественном выборе
+                if (selected.length > 1) {
+                    editPointBtn.style.display = 'none';
+                } else {
+                    editPointBtn.style.display = '';
+                }
             } else {
                 selectedPointPanel.classList.remove('active');
             }
@@ -480,12 +488,12 @@
         });
 
         editPointBtn.addEventListener('click', function () {
-            const selected = document.querySelector('input[name="selected_point"]:checked');
-            if (!selected) {
-                showNotification('Выберите точку для редактирования', 'info');
+            const selected = document.querySelectorAll('input[name="selected_point"]:checked');
+            if (selected.length !== 1) {
+                showNotification('Выберите одну точку для редактирования', 'info');
                 return;
             }
-            const point = state.points.find(p => String(p.id) === String(selected.value));
+            const point = state.points.find(p => String(p.id) === String(selected[0].value));
             if (!point) {
                 showNotification('Не удалось найти данные точки', 'error');
                 return;
@@ -495,26 +503,33 @@
         });
 
         deletePointBtn.addEventListener('click', async function () {
-            const selected = document.querySelector('input[name="selected_point"]:checked');
-            if (!selected) {
+            const selected = Array.from(document.querySelectorAll('input[name="selected_point"]:checked'));
+            if (selected.length === 0) {
                 showNotification('Выберите точку для удаления', 'info');
                 return;
             }
-            const point = state.points.find(p => String(p.id) === String(selected.value));
-            if (!point) return;
 
-            if (confirm(`Удалить точку "${point.address}"?`)) {
+            const pointNames = selected.map(s => {
+                const point = state.points.find(p => String(p.id) === String(s.value));
+                return point ? point.address : s.value;
+            }).join(', ');
+
+            if (confirm(`Удалить ${selected.length} точек: ${pointNames}?`)) {
                 try {
-                    const result = await api.delete(`/api/points/${point.id}`);
-                    if (result.success) {
-                        showNotification('Точка успешно удалена', 'success');
+                    let successCount = 0;
+                    for (const s of selected) {
+                        const result = await api.delete(`/api/points/${s.value}`);
+                        if (result.success) successCount++;
+                    }
+                    if (successCount > 0) {
+                        showNotification(`Удалено ${successCount} точек`, 'success');
                         await loadPointsList();
                         updateSelectedPointPanel();
                     } else {
-                        showNotification(result.message || 'Ошибка при удалении', 'error');
+                        showNotification('Ошибка при удалении', 'error');
                     }
                 } catch (error) {
-                    console.error('Error deleting point:', error);
+                    console.error('Error deleting points:', error);
                     showNotification('Ошибка соединения с сервером', 'error');
                 }
             }
