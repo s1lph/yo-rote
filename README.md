@@ -2,15 +2,13 @@
 
 **yo.route** — это современная веб-платформа для автоматизации доставки, оптимизации маршрутов и управления курьерами. Система использует алгоритмы VRP (Vehicle Routing Problem) для построения оптимальных маршрутов и интеграцию с Telegram для управления курьерами в реальном времени.
 
----
 
-## Содержание
+## FastLink
 
 - [Возможности](#возможности)
 - [Технологический стек](#технологический-стек)
 - [Лицензия](#лицензия)
 
----
 
 ## Возможности
 
@@ -34,7 +32,6 @@
 - Изоляция данных пользователей (multi-tenant)
 - Google OAuth 2.0 для быстрой авторизации
 
----
 
 ## Технологический стек
 
@@ -42,9 +39,8 @@
 | Технология | Назначение |
 |------------|------------|
 | **Flask 3.0** | Веб-фреймворк |
-| **Flask-SQLAlchemy** | ORM для работы с БД |
 | **SQLite** | База данных |
-| **OpenRouteService** | Геокодинг + VRP оптимизация |
+| **OpenRouteService** | Геокодинг + VRP |
 | **PyJWT** | Аутентификация через токены |
 | **Authlib** | Google OAuth 2.0 |
 | **aiogram 3.x** | Telegram-бот |
@@ -73,12 +69,10 @@
 
 Подробнее: [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/)
 
----
 
-**Автор:** Dmitriy Kutuzov ([@s1lph](https://github.com/s1lph))
+**Автор:** Dmitriy "s1lph" Kutuzov ([@s1lph](https://github.com/s1lph))
 
----
 
 <p align="center">
-  Built with ❤️ for small business delivery
+  Сделано с ❤️ for small business delivery
 </p>
